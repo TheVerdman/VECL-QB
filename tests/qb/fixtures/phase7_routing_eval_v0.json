@@ -1,0 +1,121 @@
+[
+  {
+    "id": "sympy-001",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Simplify sin(x)^2 + cos(x)^2 exactly.",
+      "operation": "simplify",
+      "expression": "sin(x)**2 + cos(x)**2"
+    },
+    "expected_specialist_id": "sympy"
+  },
+  {
+    "id": "sympy-002",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Solve the polynomial x^2 - 4 = 0.",
+      "operation": "solve",
+      "expression": "x**2 - 4",
+      "variable": "x"
+    },
+    "expected_specialist_id": "sympy"
+  },
+  {
+    "id": "sympy-003",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Differentiate x^3 + 2*x with respect to x.",
+      "operation": "differentiate",
+      "expression": "x**3 + 2*x",
+      "variable": "x"
+    },
+    "expected_specialist_id": "sympy"
+  },
+  {
+    "id": "sympy-004",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Integrate 2*x from symbolic calculus.",
+      "operation": "integrate",
+      "expression": "2*x",
+      "variable": "x"
+    },
+    "expected_specialist_id": "sympy"
+  },
+  {
+    "id": "sympy-005",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Factor x^2 - 1 over the rationals.",
+      "operation": "factor",
+      "expression": "x**2 - 1"
+    },
+    "expected_specialist_id": "sympy"
+  },
+  {
+    "id": "blast-001",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Align this nucleotide query against the local BLAST database.",
+      "query_sequence": "ATGCGTACGTAGCTAGCTAGCTAG",
+      "max_target_seqs": 3
+    },
+    "expected_specialist_id": "blast"
+  },
+  {
+    "id": "blast-002",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Use BLAST to find the best hit for this DNA sequence.",
+      "query_sequence": "ATGCGTACGTAGCTAGCTAGCTAG",
+      "max_target_seqs": 3
+    },
+    "expected_specialist_id": "blast"
+  },
+  {
+    "id": "blast-003",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Which sequence in the database aligns to this short nucleotide read?",
+      "query_sequence": "TTTTCCCCAAAAGGGGTTTTCCCC",
+      "max_target_seqs": 3
+    },
+    "expected_specialist_id": "blast"
+  },
+  {
+    "id": "blast-004",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Run a local sequence alignment and return tabular top hits.",
+      "query_sequence": "ATGCGTACGTAGCTAGCTAGCTAG",
+      "max_target_seqs": 3
+    },
+    "expected_specialist_id": "blast"
+  },
+  {
+    "id": "blast-005",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Search the nucleotide database for homologs of this query.",
+      "query_sequence": "TTTTCCCCAAAAGGGGTTTTCCCC",
+      "max_target_seqs": 3
+    },
+    "expected_specialist_id": "blast"
+  },
+  {
+    "id": "ood-001",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Summarize the plot of Hamlet in one sentence."
+    },
+    "expected_specialist_id": null
+  },
+  {
+    "id": "ood-002",
+    "task_type": "tool_request",
+    "input_payload": {
+      "query": "Draft a friendly email to reschedule lunch."
+    },
+    "expected_specialist_id": null
+  }
+]

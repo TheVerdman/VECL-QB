@@ -1,0 +1,79 @@
+[
+  {
+    "id": "demand-001",
+    "task_type": "demand_forecast",
+    "input_payload": {
+      "query": "Forecast weekly demand for SKU-A and tell me whether to increase inventory for the next four weeks.",
+      "series_id": "sku-a",
+      "history": [100, 104, 108, 112, 116, 120, 124, 128],
+      "horizon": 4,
+      "period": "week",
+      "current_inventory": 450
+    },
+    "expected_specialist_id": "timesfm",
+    "expected_reorder_needed": true
+  },
+  {
+    "id": "demand-002",
+    "task_type": "demand_forecast",
+    "input_payload": {
+      "query": "Demand has been stable. Forecast the next six weeks and decide whether inventory is enough.",
+      "series_id": "sku-b",
+      "history": [52, 51, 53, 52, 51, 52, 53, 52, 51, 52],
+      "horizon": 6,
+      "period": "week",
+      "current_inventory": 500
+    },
+    "expected_specialist_id": "timesfm",
+    "expected_reorder_needed": false
+  },
+  {
+    "id": "demand-003",
+    "task_type": "demand_forecast",
+    "input_payload": {
+      "query": "Forecast demand for a promoted SKU and tell operations if more stock is needed.",
+      "series_id": "promo-sku",
+      "history": [180, 195, 210, 225, 240, 255, 270, 285, 300],
+      "horizon": 4,
+      "period": "week",
+      "current_inventory": 900
+    },
+    "expected_specialist_id": "timesfm",
+    "expected_reorder_needed": true
+  },
+  {
+    "id": "demand-004",
+    "task_type": "demand_forecast",
+    "input_payload": {
+      "query": "Use the demand history to forecast the next month and summarize inventory risk.",
+      "series_id": "sku-c",
+      "history": [240, 228, 216, 204, 192, 180, 168, 156, 144],
+      "horizon": 4,
+      "period": "week",
+      "current_inventory": 700
+    },
+    "expected_specialist_id": "timesfm",
+    "expected_reorder_needed": false
+  },
+  {
+    "id": "ood-001",
+    "task_type": "demand_forecast",
+    "input_payload": {
+      "query": "Factor x^2 - 1 exactly.",
+      "operation": "factor",
+      "expression": "x**2 - 1"
+    },
+    "expected_specialist_id": null,
+    "expected_reorder_needed": null
+  },
+  {
+    "id": "ood-002",
+    "task_type": "demand_forecast",
+    "input_payload": {
+      "query": "Align this nucleotide read against a local sequence database.",
+      "query_sequence": "ATGCGTACGTAGCTAGCTAGCTAG"
+    },
+    "expected_specialist_id": null,
+    "expected_reorder_needed": null
+  }
+]

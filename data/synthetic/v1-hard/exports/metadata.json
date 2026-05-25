@@ -1,0 +1,18 @@
+{
+  "export_counts": {
+    "hard-heldout": 947,
+    "heldout": 973,
+    "train": 16993
+  },
+  "input": "data/synthetic/v1-hard/corpus.jsonl",
+  "output_dir": "data/synthetic/v1-hard/exports",
+  "paths": {
+    "hard-heldout": "data/synthetic/v1-hard/exports/hard-heldout.jsonl",
+    "heldout": "data/synthetic/v1-hard/exports/heldout.jsonl",
+    "train": "data/synthetic/v1-hard/exports/train.jsonl"
+  },
+  "skipped": {
+    "non_executable": 6087
+  },
+  "valid": true
+}

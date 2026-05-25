@@ -1,0 +1,61 @@
+{
+  "actual_count": 420,
+  "corpus_path": "/Users/andrewverdiramo/Desktop/VECL-QB/data/synthetic/v0-small/corpus.jsonl",
+  "dataset_hash": "4da5fa47f1bef93914635455d5e707fd28168e9285d66604047274330311e74d",
+  "llm_augmentation_used": false,
+  "llm_cache_entries": 0,
+  "seed": 1107,
+  "size": "v0-small",
+  "target_count": 420,
+  "validation": {
+    "category_counts": {
+      "blast_config": 20,
+      "blast_fixture_tool_call": 32,
+      "blast_negative": 13,
+      "cross_specialist_regression": 16,
+      "stockfish_final_answer": 24,
+      "stockfish_negative": 17,
+      "stockfish_tool_call": 44,
+      "sympy_final_answer": 25,
+      "sympy_negative": 17,
+      "sympy_tool_call": 41,
+      "terraform_human_review": 12,
+      "terraform_mutation_refusal": 20,
+      "terraform_negative": 12,
+      "terraform_plan_tool_call": 29,
+      "terraform_validate_tool_call": 13,
+      "timesfm_demand_tool_call": 32,
+      "timesfm_inventory_final_answer": 16,
+      "timesfm_negative": 12,
+      "timesfm_to_sympy_tool_call": 16,
+      "yosys_openroad_placeholder": 9
+    },
+    "dataset_hash": "4da5fa47f1bef93914635455d5e707fd28168e9285d66604047274330311e74d",
+    "domain_counts": {
+      "blast": 65,
+      "cross": 32,
+      "eda": 9,
+      "stockfish": 85,
+      "sympy": 83,
+      "terraform": 86,
+      "timesfm": 60
+    },
+    "executable_records": 308,
+    "issues": [],
+    "split_counts": {
+      "heldout": 42,
+      "train": 378
+    },
+    "supervised_records": 308,
+    "task_kind_counts": {
+      "final_answer": 65,
+      "no_tool_json": 71,
+      "placeholder": 9,
+      "refusal": 20,
+      "review": 12,
+      "tool_call_json": 243
+    },
+    "total_records": 420,
+    "valid": true
+  }
+}

@@ -1,0 +1,16 @@
+[
+  {
+    "id": "stockfish_depth_12",
+    "prompt": "Analyze this chess position with Stockfish at depth 12 and explain the best move. FEN: rnbqkbnr/pppp1ppp/4p3/8/3P4/8/PPP1PPPP/RNBQKBNR b KQkq - 0 2",
+    "task_type_hint": "unknown",
+    "expected_specialist_id": "stockfish",
+    "expected_task_type": "chess_eval"
+  },
+  {
+    "id": "sympy_simplify_expression",
+    "prompt": "Use the symbolic math specialist to simplify (x + 1)^2 and return the exact expression.",
+    "task_type_hint": "unknown",
+    "expected_specialist_id": "sympy",
+    "expected_task_type": "symbolic_math"
+  }
+]

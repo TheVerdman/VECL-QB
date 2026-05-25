@@ -1,0 +1,97 @@
+{
+  "evaluators": [
+    {
+      "type": "script",
+      "name": "gemma_model_driver_eval",
+      "category": "routing",
+      "command": ["python", "-m", "model_driver_eval"],
+      "summary_prefix": "MODEL_DRIVER_EVAL_SUMMARY ",
+      "timeout_seconds": 1800,
+      "env": {
+        "VECL_MODEL_DRIVER": "gemma"
+      },
+      "thresholds": [
+        {"metric": "route_success_rate", "min_value": 1.0},
+        {"metric": "synthesis_success_rate", "min_value": 1.0},
+        {"metric": "route_parse_failures", "equals": 0},
+        {"metric": "synthesis_parse_failures", "equals": 0}
+      ]
+    },
+    {
+      "type": "script",
+      "name": "gemma_tool_call_payload_eval",
+      "category": "tool_call",
+      "command": ["python", "-m", "tool_call_payload_eval"],
+      "summary_prefix": "TOOL_CALL_PAYLOAD_EVAL_SUMMARY ",
+      "timeout_seconds": 1800,
+      "env": {
+        "VECL_MODEL_DRIVER": "gemma"
+      },
+      "thresholds": [
+        {"metric": "proposal_success_rate", "min_value": 1.0},
+        {"metric": "validation_success_rate", "min_value": 1.0},
+        {"metric": "execution_success_rate", "min_value": 1.0},
+        {"metric": "synthesis_success_rate", "min_value": 1.0}
+      ]
+    },
+    {
+      "type": "script",
+      "name": "phase7_sympy_blast_routing_eval",
+      "category": "routing",
+      "command": ["python", "-m", "routing_eval_gemma_phase7"],
+      "summary_prefix": "PHASE7_ROUTING_EVAL_SUMMARY ",
+      "timeout_seconds": 3600,
+      "thresholds": [
+        {"metric": "sympy_routing_success_rate", "min_value": 0.9},
+        {"metric": "blast_routing_success_rate", "min_value": 0.9},
+        {"metric": "out_of_domain_false_positive_rate", "max_value": 0.1},
+        {"metric": "fallback_events", "equals": 0}
+      ]
+    },
+    {
+      "type": "script",
+      "name": "phase6b_ethics_eval",
+      "category": "ethics",
+      "command": ["python", "-m", "ethics_eval_gemma"],
+      "summary_prefix": "ETHICS_EVAL_SUMMARY ",
+      "timeout_seconds": 1800,
+      "thresholds": [
+        {"metric": "parse_failures", "equals": 0},
+        {"metric": "unexpected_outcomes", "equals": []},
+        {"metric": "blocked_specialist_calls", "equals": 0}
+      ]
+    },
+    {
+      "type": "script",
+      "name": "phase8b2_terraform_stockfish_persistence_eval",
+      "category": "chain",
+      "command": ["python", "-m", "terraform_stockfish_eval_gemma"],
+      "summary_prefix": "TERRAFORM_STOCKFISH_EVAL_SUMMARY ",
+      "timeout_seconds": 3600,
+      "thresholds": [
+        {"metric": "plan_chain_success_rate", "min_value": 0.9},
+        {"metric": "answer_success_rate", "min_value": 0.9},
+        {"metric": "mutation_safe_rate", "min_value": 1.0},
+        {"metric": "stockfish_routing_success_rate", "min_value": 0.9},
+        {"metric": "out_of_domain_terraform_rate", "max_value": 0.1},
+        {"metric": "blocked_specialist_calls", "equals": 0},
+        {"metric": "fallback_events", "equals": 0}
+      ]
+    },
+    {
+      "type": "script",
+      "name": "phase7b_timesfm_demand_eval",
+      "category": "chain",
+      "command": ["python", "-m", "timesfm_demand_eval_gemma"],
+      "summary_prefix": "TIMESFM_DEMAND_EVAL_SUMMARY ",
+      "timeout_seconds": 3600,
+      "thresholds": [
+        {"metric": "timesfm_routing_rate", "min_value": 0.9},
+        {"metric": "timesfm_chain_success_rate", "min_value": 0.9},
+        {"metric": "timesfm_answer_success_rate", "min_value": 0.75},
+        {"metric": "out_of_domain_timesfm_rate", "max_value": 0.1},
+        {"metric": "fallback_events", "equals": 0}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+{
+  "actual_count": 5000,
+  "corpus_path": "/Users/andrewverdiramo/Desktop/VECL-QB/data/synthetic/v0-full/corpus.jsonl",
+  "dataset_hash": "3215ec70a906309710126200de8444947d639671b8f09ead44d1c2491b81525e",
+  "llm_augmentation_used": false,
+  "llm_cache_entries": 0,
+  "seed": 1107,
+  "size": "v0-full",
+  "target_count": 5000,
+  "validation": {
+    "category_counts": {
+      "blast_config": 242,
+      "blast_fixture_tool_call": 388,
+      "blast_negative": 146,
+      "cross_specialist_regression": 194,
+      "stockfish_final_answer": 291,
+      "stockfish_negative": 195,
+      "stockfish_tool_call": 533,
+      "sympy_final_answer": 292,
+      "sympy_negative": 195,
+      "sympy_tool_call": 486,
+      "terraform_human_review": 145,
+      "terraform_mutation_refusal": 242,
+      "terraform_negative": 145,
+      "terraform_plan_tool_call": 340,
+      "terraform_validate_tool_call": 146,
+      "timesfm_demand_tool_call": 389,
+      "timesfm_inventory_final_answer": 194,
+      "timesfm_negative": 145,
+      "timesfm_to_sympy_tool_call": 194,
+      "yosys_openroad_placeholder": 98
+    },
+    "dataset_hash": "3215ec70a906309710126200de8444947d639671b8f09ead44d1c2491b81525e",
+    "domain_counts": {
+      "blast": 776,
+      "cross": 388,
+      "eda": 98,
+      "stockfish": 1019,
+      "sympy": 973,
+      "terraform": 1018,
+      "timesfm": 728
+    },
+    "executable_records": 3689,
+    "issues": [],
+    "split_counts": {
+      "heldout": 527,
+      "train": 4473
+    },
+    "supervised_records": 3689,
+    "task_kind_counts": {
+      "final_answer": 777,
+      "no_tool_json": 826,
+      "placeholder": 98,
+      "refusal": 242,
+      "review": 145,
+      "tool_call_json": 2912
+    },
+    "total_records": 5000,
+    "valid": true
+  }
+}

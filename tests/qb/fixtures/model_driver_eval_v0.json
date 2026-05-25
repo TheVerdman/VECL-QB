@@ -1,0 +1,28 @@
+[
+  {
+    "id": "terraform_plan_route",
+    "task_type": "infrastructure_plan",
+    "input_payload": {
+      "query": "Use Terraform to tell me what would change in this local module.",
+      "operation": "plan"
+    },
+    "expected_specialist_id": "terraform"
+  },
+  {
+    "id": "stockfish_route",
+    "task_type": "chess_eval",
+    "input_payload": {
+      "query": "What is the best chess engine move from the starting position?",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+    },
+    "expected_specialist_id": "stockfish"
+  },
+  {
+    "id": "unsupported_weather_route",
+    "task_type": "weather",
+    "input_payload": {
+      "query": "Will it rain in Boston tomorrow?"
+    },
+    "expected_specialist_id": null
+  }
+]

@@ -1,0 +1,37 @@
+#!/bin/sh
+set -eu
+
+image="${OPENROAD_DOCKER_IMAGE:-openroad/orfs}"
+logical_workdir="${PWD:-$(pwd)}"
+physical_workdir="$(pwd -P)"
+alias_workdir=""
+case "$physical_workdir" in
+  /private/*) alias_workdir="/${physical_workdir#/private/}" ;;
+esac
+
+if [ "$logical_workdir" = "$physical_workdir" ] && [ -z "$alias_workdir" ]; then
+  exec docker run --platform linux/amd64 --rm \
+    -v "$physical_workdir:$physical_workdir" \
+    -w "$physical_workdir" \
+    "$image" \
+    bash -lc 'source /OpenROAD-flow-scripts/env.sh && exec openroad "$@"' \
+    openroad "$@"
+fi
+
+if [ -n "$alias_workdir" ] && [ "$logical_workdir" = "$physical_workdir" ]; then
+  exec docker run --platform linux/amd64 --rm \
+    -v "$physical_workdir:$physical_workdir" \
+    -v "$physical_workdir:$alias_workdir" \
+    -w "$physical_workdir" \
+    "$image" \
+    bash -lc 'source /OpenROAD-flow-scripts/env.sh && exec openroad "$@"' \
+    openroad "$@"
+fi
+
+exec docker run --platform linux/amd64 --rm \
+  -v "$physical_workdir:$physical_workdir" \
+  -v "$physical_workdir:$logical_workdir" \
+  -w "$logical_workdir" \
+  "$image" \
+  bash -lc 'source /OpenROAD-flow-scripts/env.sh && exec openroad "$@"' \
+  openroad "$@"

@@ -1,0 +1,66 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "vecl-qb"
+version = "0.1.0"
+description = "Python-first prototype for provenance-first expert orchestration and bounded continual learning."
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+  "hypothesis>=6.100",
+  "networkx>=3.3",
+  "numpy>=2.0",
+  "pydantic>=2.7",
+  "pytest>=8.2",
+  "PyYAML>=6.0",
+  "sympy>=1.13",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy>=1.10",
+  "ruff>=0.5",
+]
+episodic = [
+  "qdrant-client>=1.12",
+]
+episodic-embeddings = [
+  "sentence-transformers>=3.0",
+]
+substrate = [
+  "accelerate>=1.0",
+  "bitsandbytes>=0.45; platform_system == 'Linux'",
+  "peft>=0.14",
+  "sentencepiece>=0.2",
+  "torch>=2.5",
+  "torchvision>=0.20",
+  "transformers>=5.0",
+]
+
+[project.scripts]
+vecl = "vecl.cli:main"
+
+[tool.hatch.build.targets.wheel]
+packages = ["vecl"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["vecl"]
+ignore_missing_imports = true
+warn_unused_ignores = true
+disallow_untyped_defs = false
+check_untyped_defs = true

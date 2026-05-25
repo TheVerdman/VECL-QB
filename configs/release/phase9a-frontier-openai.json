@@ -1,0 +1,40 @@
+{
+  "evaluators": [
+    {
+      "type": "script",
+      "name": "openai_model_driver_eval",
+      "category": "routing",
+      "command": [".venv/bin/python", "scripts/model_driver_eval.py"],
+      "summary_prefix": "MODEL_DRIVER_EVAL_SUMMARY ",
+      "timeout_seconds": 900,
+      "env": {
+        "VECL_MODEL_DRIVER": "openai"
+      },
+      "thresholds": [
+        {"metric": "route_success_rate", "min_value": 1.0},
+        {"metric": "synthesis_success_rate", "min_value": 1.0},
+        {"metric": "route_parse_failures", "equals": 0},
+        {"metric": "synthesis_parse_failures", "equals": 0}
+      ]
+    },
+    {
+      "type": "script",
+      "name": "openai_tool_call_payload_eval",
+      "category": "tool_call",
+      "command": [".venv/bin/python", "scripts/tool_call_payload_eval.py"],
+      "summary_prefix": "TOOL_CALL_PAYLOAD_EVAL_SUMMARY ",
+      "timeout_seconds": 900,
+      "env": {
+        "VECL_MODEL_DRIVER": "openai"
+      },
+      "thresholds": [
+        {"metric": "proposal_success_rate", "min_value": 1.0},
+        {"metric": "validation_success_rate", "min_value": 1.0},
+        {"metric": "execution_success_rate", "min_value": 1.0},
+        {"metric": "synthesis_success_rate", "min_value": 1.0},
+        {"metric": "tool_call_events", "equals": 2},
+        {"metric": "artifact_events", "equals": 2}
+      ]
+    }
+  ]
+}
