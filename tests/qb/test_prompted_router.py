@@ -6,7 +6,7 @@ from pathlib import Path
 
 import pytest
 
-from vecl.provenance.events import EventType
+from vecl.provenance.events import EventType, ProvenanceEvent
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb._llm_inference import DEFAULT_ROUTING_MODEL_ID
 from vecl.qb.orchestrator import QBOrchestrator
@@ -128,7 +128,7 @@ def test_prompted_router_records_decision_before_specialist_invocation() -> None
     assert event_types[:3] == [
         EventType.EVIDENCE_INGESTED,
         EventType.LLM_ROUTING_DECIDED,
-        EventType.REPLAY_BATCH_PREPARED,
+        EventType.FINAL_RESPONSE_RECORDED,
     ]
     decision = ledger.find_by_type(EventType.LLM_ROUTING_DECIDED)[0]
     assert decision.parent_event_ids == [result.provenance_event_ids[0]]
@@ -138,6 +138,9 @@ def test_prompted_router_records_decision_before_specialist_invocation() -> None
 
 def test_parse_failure_falls_back_to_rule_router_and_records_event() -> None:
     ledger = ProvenanceLedger()
+    parent = ledger.append(
+        ProvenanceEvent(EventType.EVIDENCE_INGESTED, "tenant", "test", {"request_id": "req"})
+    )
     specialist = MockSpecialist("stockfish", {"chess_eval"})
     router = PromptedLLMRouter(
         ledger=ledger,
@@ -146,13 +149,15 @@ def test_parse_failure_falls_back_to_rule_router_and_records_event() -> None:
     )
     router.register_specialist(_stockfish_card(), specialist)
 
-    routed = router.route(_request())
+    request = _request()
+    request.provenance_context["parent_event_id"] = parent.event_id
+    routed = router.route(request)
 
     fallback = ledger.find_by_type(EventType.ROUTING_FALLBACK)[0]
     assert routed == [specialist]
     assert fallback.payload["fallback_specialist_id"] == "stockfish"
     assert "could not parse" in str(fallback.payload["parse_failure_reason"])
-    assert fallback.parent_event_ids == ["evt-request"]
+    assert fallback.parent_event_ids == [parent.event_id]
 
 
 def test_inference_failure_is_not_silent_fallback() -> None:

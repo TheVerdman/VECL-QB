@@ -11,7 +11,7 @@ import yaml
 try:
     import tomllib
 except ModuleNotFoundError:  # pragma: no cover - only needed by Vertex Python 3.10 package.
-    import tomli as tomllib  # type: ignore[no-redef]
+    import tomli as tomllib
 
 from vecl.qb.router import QBRouter, SpecialistCard
 from vecl.qb.specialist import Specialist

@@ -6,6 +6,7 @@ from pathlib import Path
 
 import pytest
 
+from vecl.provenance.events import EventType, ProvenanceEvent
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb.chain_executor import ChainExecutor
 from vecl.qb.planner import ChainPlan, ChainStep
@@ -36,14 +37,16 @@ endmodule
 """
 
 
-def _request(task_type: str, payload: dict[str, object]) -> SpecialistRequest:
+def _request(
+    task_type: str, payload: dict[str, object], *, parent_event_id: str = "evt-parent"
+) -> SpecialistRequest:
     return SpecialistRequest(
         "req-eda",
         "tenant-eda",
         task_type,
         payload,
         {},
-        {"parent_event_id": "evt-parent"},
+        {"parent_event_id": parent_event_id},
     )
 
 
@@ -112,6 +115,9 @@ def test_yosys_to_openroad_chain_hands_off_netlist_artifact(tmp_path: Path) -> N
     yosys = YosysSpecialist(binary=_fake_yosys(tmp_path), artifact_store=store)
     openroad = OpenROADSpecialist(binary=_fake_openroad(tmp_path), artifact_store=store)
     ledger = ProvenanceLedger()
+    parent = ledger.append(
+        ProvenanceEvent(EventType.EVIDENCE_INGESTED, "tenant-eda", "test", {"request_id": "req"})
+    )
     executor = ChainExecutor(
         ledger=ledger,
         specialists={"yosys": yosys, "openroad": openroad},
@@ -139,6 +145,7 @@ def test_yosys_to_openroad_chain_hands_off_netlist_artifact(tmp_path: Path) -> N
                 "top_module": "vecl_topk_helper",
                 "verilog_text": TINY_RTL,
             },
+            parent_event_id=parent.event_id,
         ),
     )
 

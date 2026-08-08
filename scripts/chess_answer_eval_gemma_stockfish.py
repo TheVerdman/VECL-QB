@@ -17,6 +17,7 @@ from scripts.chain_eval_gemma_stockfish import (
     stockfish_chain_plan,
 )
 from scripts.routing_eval_gemma_stockfish import ensure_stockfish_18
+from vecl._paths import environment_directory
 from vecl.provenance.events import EventType
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb._llm_inference import DEFAULT_ROUTING_MODEL_ID, gemma_route_once
@@ -102,7 +103,7 @@ def main() -> int:
     max_transcript_chars = int(os.environ.get("VECL_CHESS_ANSWER_TRANSCRIPT_CHARS", "6000"))
 
     stockfish_binary = ensure_stockfish_18()
-    artifact_root = Path(os.environ.get("VECL_ARTIFACT_STORE", "/tmp/vecl-answer-artifacts"))
+    artifact_root = environment_directory("VECL_ARTIFACT_STORE", prefix="vecl-answer-artifacts-")
     store = ContentAddressedStore(artifact_root)
     ledger = ProvenanceLedger()
     router = PromptedLLMRouter(ledger=ledger, model_id=model_id)

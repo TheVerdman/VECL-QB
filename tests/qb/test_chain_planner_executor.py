@@ -15,13 +15,39 @@ from vecl.qb.specialist import Specialist, SpecialistClaim, SpecialistRequest, S
 from vecl.qb.verifier import VerificationPolicy
 from vecl.specialists.artifacts import ContentAddressedStore
 from vecl.specialists.blast_specialist import BLASTSpecialist, resolve_blast_binary
-from vecl.specialists.stockfish import StockfishSpecialist
+from vecl.specialists.stockfish import StockfishSpecialist, resolve_stockfish_binary
 from vecl.specialists.sympy_specialist import SymPySpecialist
 from vecl.specialists.timesfm_specialist import DeterministicTimesFMRunner, TimesFMSpecialist
 
 STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 SUBJECT_SEQUENCE = "ATGCGTACGTAGCTAGCTAGCTAG"
 DEMAND_HISTORY = [100, 104, 108, 112, 116, 120, 124, 128]
+
+
+def _stockfish_available() -> bool:
+    try:
+        resolve_stockfish_binary()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+def _blast_available(name: str) -> bool:
+    try:
+        resolve_blast_binary(name)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+_requires_stockfish = pytest.mark.skipif(
+    not _stockfish_available(),
+    reason="Stockfish 18 is not installed; this is an optional real-tool test",
+)
+_requires_blast = pytest.mark.skipif(
+    not (_blast_available("blastn") and _blast_available("makeblastdb")),
+    reason="NCBI BLAST+ is not installed; this is an optional real-tool test",
+)
 
 
 class JsonProducerSpecialist(Specialist):
@@ -277,6 +303,8 @@ def test_failed_chain_aborts_and_preserves_prior_artifact(tmp_path: Path) -> Non
     assert aborted.parent_event_ids == [failed.event_id]
 
 
+@pytest.mark.optional
+@_requires_stockfish
 def test_real_stockfish_chain_can_feed_synthetic_postprocessor(tmp_path: Path) -> None:
     stockfish = StockfishSpecialist(artifact_store=ContentAddressedStore(tmp_path))
     formatter = StockfishFormatterSpecialist()
@@ -313,6 +341,8 @@ def test_real_stockfish_chain_can_feed_synthetic_postprocessor(tmp_path: Path) -
     assert len(ledger.find_by_type(EventType.ARTIFACT_PRODUCED)) == 1
 
 
+@pytest.mark.optional
+@_requires_blast
 def test_real_blast_chain_feeds_sympy_summary(tmp_path: Path) -> None:
     db_prefix = _tiny_blast_db(tmp_path)
     store = ContentAddressedStore(tmp_path / "artifacts")

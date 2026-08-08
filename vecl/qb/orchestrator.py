@@ -208,7 +208,7 @@ class QBOrchestrator:
             payload["episodic_event_ids"] = list(chain_execution.episodic_event_ids)
         return self.ledger.append(
             ProvenanceEvent(
-                event_type=EventType.REPLAY_BATCH_PREPARED,
+                event_type=EventType.FINAL_RESPONSE_RECORDED,
                 tenant_id=request.tenant_id,
                 actor="qb-orchestrator",
                 parent_event_ids=[parent_event_id],

@@ -8,12 +8,12 @@ from typing import Any
 from vecl.evaluation.evaluators import evaluators_from_manifest
 from vecl.evaluation.release import (
     approve_release_report,
-    default_phase9a_evaluators,
     load_release_report,
     reject_release_report,
     run_release_evaluation,
     save_release_report,
 )
+from vecl.provenance.events import stable_hash
 from vecl.provenance.ledger import ProvenanceLedger, SqliteProvenanceLedger
 
 
@@ -25,7 +25,7 @@ def main(argv: list[str] | None = None) -> int:
 
     evaluate = release_subparsers.add_parser("evaluate")
     evaluate.add_argument("candidate_id")
-    evaluate.add_argument("--manifest", type=Path)
+    evaluate.add_argument("--manifest", type=Path, required=True)
     evaluate.add_argument("--output", type=Path)
 
     approve = release_subparsers.add_parser("approve")
@@ -46,22 +46,22 @@ def main(argv: list[str] | None = None) -> int:
         return _approve(args)
     if args.command == "release" and args.release_command == "reject":
         return _reject(args)
-    parser.error("unknown command")
-    return 2
+    raise RuntimeError("unreachable command dispatch")
 
 
 def _evaluate(args: argparse.Namespace) -> int:
-    evaluators = (
-        evaluators_from_manifest(_load_json(args.manifest))
-        if args.manifest
-        else default_phase9a_evaluators()
+    manifest = _load_json(args.manifest)
+    evaluators = evaluators_from_manifest(manifest)
+    report = run_release_evaluation(
+        args.candidate_id,
+        evaluators,
+        manifest_hash=stable_hash(manifest),
     )
-    report = run_release_evaluation(args.candidate_id, evaluators)
     payload = report.to_payload()
     if args.output:
         save_release_report(report, args.output)
     print(json.dumps(payload, sort_keys=True))
-    return 0 if report.passed else 1
+    return 0 if report.approval_eligible else 1
 
 
 def _approve(args: argparse.Namespace) -> int:

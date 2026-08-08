@@ -1,7 +1,8 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 import numpy as np
 
+from vecl._compat import UTC
 from vecl.runtime.metrics import adversarial_metrics
 from vecl.sleep.replay import ReplayBatchBuilder, ReplayCandidate, ReplayPolicy
 from vecl.sparse.oracle import sparse_update_oracle

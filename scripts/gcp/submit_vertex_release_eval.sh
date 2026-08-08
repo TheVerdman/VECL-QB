@@ -1,9 +1,9 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-project-49b1b523-d248-434f-bd4}"
+PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID to your Google Cloud project}"
 REGION="${REGION:-us-central1}"
-BUCKET="${BUCKET:-gs://${PROJECT_ID}-vecl-qb-artifacts}"
+BUCKET="${BUCKET:?Set BUCKET to an existing gs:// bucket}"
 JOB_TS="$(date +%Y%m%d-%H%M%S)"
 VECL_ROUTING_MODEL_ID="${VECL_ROUTING_MODEL_ID:-google/gemma-4-31B-it}"
 VECL_ROUTING_MAX_NEW_TOKENS="${VECL_ROUTING_MAX_NEW_TOKENS:-512}"
@@ -17,9 +17,12 @@ if [[ -z "${HF_TOKEN:-}" ]]; then
   exit 2
 fi
 
-PKG_DIR="/tmp/vecl-qb-release-eval-${JOB_TS}"
-PACKAGE_TGZ="/tmp/vecl-qb-release-eval-${JOB_TS}.tar.gz"
-CONFIG_YAML="/tmp/vecl-qb-release-eval-${JOB_TS}.yaml"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vecl-qb-job.XXXXXX")"
+cleanup() { rm -rf -- "$WORK_DIR"; }
+trap cleanup EXIT
+PKG_DIR="$WORK_DIR/package"
+PACKAGE_TGZ="$WORK_DIR/vecl-qb-release-eval-${JOB_TS}.tar.gz"
+CONFIG_YAML="$WORK_DIR/job.yaml"
 DISPLAY_NAME="vecl-qb-gemma-release-eval-${JOB_TS}"
 
 mkdir -p "$PKG_DIR/release_eval_job"
@@ -48,10 +51,12 @@ import os
 from pathlib import Path
 
 from release_eval_gemma_aggregate import main
+from vecl._paths import environment_directory
 
 base = Path(__file__).resolve().parent
-artifact_root = Path(os.environ.get("VECL_RELEASE_EVAL_ARTIFACT_ROOT", "/tmp/vecl-release-eval-artifacts"))
-artifact_root.mkdir(parents=True, exist_ok=True)
+artifact_root = environment_directory(
+    "VECL_RELEASE_EVAL_ARTIFACT_ROOT", prefix="vecl-release-eval-artifacts-"
+)
 
 os.environ.setdefault("VECL_MODEL_DRIVER", "gemma")
 
@@ -181,6 +186,8 @@ gcloud ai custom-jobs create \
   --display-name="$DISPLAY_NAME" \
   --config="$CONFIG_YAML"
 
+rm -f -- "$CONFIG_YAML"
+
 JOB_NAME="$(gcloud ai custom-jobs list \
   --project="$PROJECT_ID" \
   --region="$REGION" \
@@ -191,8 +198,8 @@ JOB_NAME="$(gcloud ai custom-jobs list \
 JOB_ID="${JOB_NAME##*/}"
 
 print "Vertex custom job id: ${JOB_ID}"
-print "Temporary config with HF_TOKEN: ${CONFIG_YAML}"
-print "After the job starts, delete the temporary config and unset HF_TOKEN."
+print "Temporary credential-bearing config removed after submission."
+print "Unset HF_TOKEN when no longer needed."
 
 if [[ "$STREAM_LOGS" == "true" ]]; then
   gcloud ai custom-jobs stream-logs "$JOB_ID" \

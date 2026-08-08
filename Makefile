@@ -1,9 +1,18 @@
 PYTHON ?= $(shell if [ -x .venv/bin/python ]; then echo .venv/bin/python; else echo python3; fi)
 
-.PHONY: test lint typecheck format all
+.PHONY: check coverage format format-check lint test test-core typecheck
+
+check: format-check lint typecheck test
 
 test:
 	$(PYTHON) -m pytest
+
+test-core:
+	$(PYTHON) -m pytest -m "not optional" --ignore=tests/integration --ignore=tests/episodic/test_optional_backends.py
+
+coverage:
+	$(PYTHON) -m coverage run -m pytest
+	$(PYTHON) -m coverage report
 
 lint:
 	$(PYTHON) -m ruff check .
@@ -14,4 +23,5 @@ typecheck:
 format:
 	$(PYTHON) -m ruff format .
 
-all: format lint typecheck test
+format-check:
+	$(PYTHON) -m ruff format --check .

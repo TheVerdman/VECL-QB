@@ -1,12 +1,14 @@
 from __future__ import annotations
 
 from collections.abc import Iterable
+from typing import Any
 
 import numpy as np
+from numpy.typing import NDArray
 
 
 def deterministic_top_k(
-    scores: Iterable[float] | np.ndarray, eligible_slots: Iterable[int], k: int
+    scores: Iterable[float] | NDArray[Any], eligible_slots: Iterable[int], k: int
 ) -> list[int]:
     """Return deterministic TopK by score descending and slot id ascending."""
 

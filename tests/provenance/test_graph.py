@@ -1,5 +1,6 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
 
+from vecl._compat import UTC
 from vecl.provenance.graph import ProvenanceGraph
 from vecl.trust.anchors import TrustAnchor, TrustRootKind
 

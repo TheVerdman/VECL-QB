@@ -4,6 +4,8 @@ import json
 import subprocess
 from pathlib import Path
 
+import pytest
+
 from vecl.qb.specialist import SpecialistRequest
 from vecl.specialists.artifacts import ContentAddressedStore
 from vecl.specialists.blast_specialist import (
@@ -14,6 +16,27 @@ from vecl.specialists.blast_specialist import (
 )
 
 SUBJECT_SEQUENCE = "ATGCGTACGTAGCTAGCTAGCTAG"
+
+
+def _blast_available(name: str) -> bool:
+    try:
+        resolve_blast_binary(name)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+pytestmark = [
+    pytest.mark.optional,
+    pytest.mark.skipif(
+        not _blast_available("blastn"),
+        reason="blastn is not installed; these are optional real-tool tests",
+    ),
+]
+_requires_makeblastdb = pytest.mark.skipif(
+    not _blast_available("makeblastdb"),
+    reason="makeblastdb is not installed; this is an optional real-tool test",
+)
 
 
 def _request(payload: dict[str, object]) -> SpecialistRequest:
@@ -61,6 +84,7 @@ def _tiny_blast_db(tmp_path: Path) -> Path:
     return db_prefix
 
 
+@_requires_makeblastdb
 def test_real_blastn_runs_and_writes_tsv_artifact(tmp_path: Path) -> None:
     db_prefix = _tiny_blast_db(tmp_path)
     specialist = BLASTSpecialist(artifact_store=ContentAddressedStore(tmp_path / "artifacts"))

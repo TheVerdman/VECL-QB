@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from vecl._compat import UTC
+from vecl._paths import environment_directory
 from vecl.provenance.events import stable_hash
 from vecl.qb.specialist import SpecialistClaim, SpecialistRequest, SpecialistResponse
 from vecl.specialists.artifacts import ArtifactRecord, ContentAddressedStore
@@ -192,7 +193,8 @@ class TimesFMSpecialist(ServiceSpecialist):
         else:
             root = artifact_store or os.environ.get("VECL_ARTIFACT_STORE")
             self.artifact_store = ContentAddressedStore(
-                root or Path(os.environ.get("TMPDIR", "/tmp")) / "vecl-qb-artifacts"
+                root
+                or environment_directory("VECL_ARTIFACT_STORE", prefix="vecl-timesfm-artifacts-")
             )
 
     def connect(self) -> None:

@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any
 
 from vecl._gemma import has_allowed_cuda_device, resolve_gemma_model_class, resolve_torch_dtype
+from vecl._paths import environment_directory
 from vecl.evaluation.fisher import accumulate_lora_fisher, compute_lora_snapshot_drift
 from vecl.substrate.lora_memory import LoRAMemorySubstrate
 from vecl.training.tool_use_loop import snapshot_file_hash
@@ -92,8 +93,7 @@ def main() -> int:
     rank = int(os.environ.get("VECL_FISHER_LORA_RANK", "2"))
     last_n_layers = int(os.environ.get("VECL_FISHER_LAST_N_LAYERS", "2"))
     drift_threshold = float(os.environ.get("VECL_FISHER_DRIFT_THRESHOLD", "1.0"))
-    output_dir = Path(os.environ.get("VECL_FISHER_OUTPUT_DIR", "/tmp/vecl-fisher-eval"))
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = environment_directory("VECL_FISHER_OUTPUT_DIR", prefix="vecl-fisher-eval-")
 
     processor = AutoProcessor.from_pretrained(model_id, token=token)
     model_kwargs: dict[str, Any] = {"device_map": device_map, "token": token}

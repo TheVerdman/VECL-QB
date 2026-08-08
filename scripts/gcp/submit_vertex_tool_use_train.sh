@@ -1,9 +1,9 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-project-49b1b523-d248-434f-bd4}"
+PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID to your Google Cloud project}"
 REGION="${REGION:-us-central1}"
-BUCKET="${BUCKET:-gs://${PROJECT_ID}-vecl-qb-artifacts}"
+BUCKET="${BUCKET:?Set BUCKET to an existing gs:// bucket}"
 JOB_TS="$(date +%Y%m%d-%H%M%S)"
 VECL_TRAIN_MODEL_ID="${VECL_TRAIN_MODEL_ID:-google/gemma-4-31B-it}"
 STREAM_LOGS="${STREAM_LOGS:-true}"
@@ -13,9 +13,12 @@ if [[ -z "${HF_TOKEN:-}" ]]; then
   exit 2
 fi
 
-PKG_DIR="/tmp/vecl-qb-tool-use-train-${JOB_TS}"
-PACKAGE_TGZ="/tmp/vecl-qb-tool-use-train-${JOB_TS}.tar.gz"
-CONFIG_YAML="/tmp/vecl-qb-tool-use-train-${JOB_TS}.yaml"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vecl-qb-job.XXXXXX")"
+cleanup() { rm -rf -- "$WORK_DIR"; }
+trap cleanup EXIT
+PKG_DIR="$WORK_DIR/package"
+PACKAGE_TGZ="$WORK_DIR/vecl-qb-tool-use-train-${JOB_TS}.tar.gz"
+CONFIG_YAML="$WORK_DIR/job.yaml"
 DISPLAY_NAME="vecl-qb-gemma-tool-use-train-${JOB_TS}"
 GCS_OUTPUT_URI="${BUCKET}/tool-use-training/${JOB_TS}"
 LOCAL_CORPUS_EXPORT_DIR="${VECL_TRAIN_CORPUS_EXPORT_DIR:-data/synthetic/v1-hard/exports}"
@@ -31,6 +34,17 @@ fi
 if [[ -n "$BASELINE_SNAPSHOT_HASH" ]]; then
   OPTIONAL_BASELINE_ENV="${OPTIONAL_BASELINE_ENV}    - name: VECL_TRAIN_BASELINE_SNAPSHOT_HASH"$'\n'
   OPTIONAL_BASELINE_ENV="${OPTIONAL_BASELINE_ENV}      value: \"${BASELINE_SNAPSHOT_HASH}\""$'\n'
+fi
+EWC_APPROVED_SNAPSHOT_URI="${VECL_TRAIN_EWC_APPROVED_SNAPSHOT_URI:-}"
+EWC_APPROVED_SNAPSHOT_HASH="${VECL_TRAIN_EWC_APPROVED_SNAPSHOT_HASH:-}"
+OPTIONAL_EWC_APPROVED_ENV=""
+if [[ -n "$EWC_APPROVED_SNAPSHOT_URI" ]]; then
+  OPTIONAL_EWC_APPROVED_ENV="${OPTIONAL_EWC_APPROVED_ENV}    - name: VECL_TRAIN_EWC_APPROVED_SNAPSHOT_URI"$'\n'
+  OPTIONAL_EWC_APPROVED_ENV="${OPTIONAL_EWC_APPROVED_ENV}      value: \"${EWC_APPROVED_SNAPSHOT_URI}\""$'\n'
+fi
+if [[ -n "$EWC_APPROVED_SNAPSHOT_HASH" ]]; then
+  OPTIONAL_EWC_APPROVED_ENV="${OPTIONAL_EWC_APPROVED_ENV}    - name: VECL_TRAIN_EWC_APPROVED_SNAPSHOT_HASH"$'\n'
+  OPTIONAL_EWC_APPROVED_ENV="${OPTIONAL_EWC_APPROVED_ENV}      value: \"${EWC_APPROVED_SNAPSHOT_HASH}\""$'\n'
 fi
 if [[ -n "${VECL_TRAIN_EXPECT_DOMAINS:-}" ]]; then
   TRAIN_EXPECT_DOMAINS="${VECL_TRAIN_EXPECT_DOMAINS}"
@@ -146,13 +160,39 @@ workerPoolSpecs:
       value: "${VECL_TRAIN_LEARNING_RATE:-0.001}"
     - name: VECL_TRAIN_GRADIENT_ACCUMULATION_STEPS
       value: "${VECL_TRAIN_GRADIENT_ACCUMULATION_STEPS:-8}"
+    - name: VECL_TRAIN_PROMPT_MODE
+      value: "${VECL_TRAIN_PROMPT_MODE:-tool_call_author}"
+    - name: VECL_TRAIN_DIAGNOSTIC_MODE
+      value: "${VECL_TRAIN_DIAGNOSTIC_MODE:-}"
+    - name: VECL_TRAIN_OVERFIT_SAMPLE_COUNT
+      value: "${VECL_TRAIN_OVERFIT_SAMPLE_COUNT:-8}"
+    - name: VECL_TRAIN_OVERFIT_TASK_KIND
+      value: "${VECL_TRAIN_OVERFIT_TASK_KIND:-tool_call_json}"
+    - name: VECL_TRAIN_OVERFIT_STEPS
+      value: "${VECL_TRAIN_OVERFIT_STEPS:-25}"
+    - name: VECL_TRAIN_OVERFIT_LEARNING_RATE
+      value: "${VECL_TRAIN_OVERFIT_LEARNING_RATE:-0.01}"
+    - name: VECL_TRAIN_OVERFIT_MIN_CE_DROP
+      value: "${VECL_TRAIN_OVERFIT_MIN_CE_DROP:-0.05}"
+    - name: VECL_TRAIN_OVERFIT_GENERATION_PROBE_COUNT
+      value: "${VECL_TRAIN_OVERFIT_GENERATION_PROBE_COUNT:-0}"
+    - name: VECL_TRAIN_SPARSE_OVERFIT_CYCLES
+      value: "${VECL_TRAIN_SPARSE_OVERFIT_CYCLES:-25}"
+    - name: VECL_TRAIN_SPARSE_OVERFIT_LEARNING_RATE
+      value: "${VECL_TRAIN_SPARSE_OVERFIT_LEARNING_RATE:-0.01}"
+    - name: VECL_TRAIN_SPARSE_OVERFIT_MAX_SLOTS
+      value: "${VECL_TRAIN_SPARSE_OVERFIT_MAX_SLOTS:-${VECL_TRAIN_MAX_SLOTS:-8}}"
+    - name: VECL_TRAIN_SPARSE_OVERFIT_GRADIENT_ACCUMULATION_STEPS
+      value: "${VECL_TRAIN_SPARSE_OVERFIT_GRADIENT_ACCUMULATION_STEPS:-${VECL_TRAIN_GRADIENT_ACCUMULATION_STEPS:-8}}"
+    - name: VECL_TRAIN_SPARSE_OVERFIT_MIN_CE_DROP
+      value: "${VECL_TRAIN_SPARSE_OVERFIT_MIN_CE_DROP:-0.05}"
     - name: VECL_TRAIN_EWC_LAMBDA
       value: "${VECL_TRAIN_EWC_LAMBDA:-0.0}"
     - name: VECL_TRAIN_EWC_DRIFT_THRESHOLD
       value: "${VECL_TRAIN_EWC_DRIFT_THRESHOLD:-1.0}"
     - name: VECL_TRAIN_BASELINE_ID
       value: "${VECL_TRAIN_BASELINE_ID:-tool_use_v0}"
-${OPTIONAL_BASELINE_ENV}    - name: VECL_TRAIN_CORPUS_EXPORT_URI
+${OPTIONAL_BASELINE_ENV}${OPTIONAL_EWC_APPROVED_ENV}    - name: VECL_TRAIN_CORPUS_EXPORT_URI
       value: "${GCS_CORPUS_EXPORT_URI}"
     - name: VECL_TRAIN_SAMPLE_COUNT
       value: "${VECL_TRAIN_SAMPLE_COUNT:-1024}"
@@ -172,12 +212,22 @@ ${OPTIONAL_BASELINE_ENV}    - name: VECL_TRAIN_CORPUS_EXPORT_URI
       value: "${TRAIN_EXPECT_DOMAINS}"
     - name: VECL_TRAIN_INTERFERENCE_THRESHOLD
       value: "${VECL_TRAIN_INTERFERENCE_THRESHOLD:-0.05}"
+    - name: VECL_TRAIN_EXPECT_REJECTION
+      value: "${VECL_TRAIN_EXPECT_REJECTION:-0}"
+    - name: VECL_TRAIN_REQUIRE_INLINE_DRIFT
+      value: "${VECL_TRAIN_REQUIRE_INLINE_DRIFT:-0}"
+    - name: VECL_TRAIN_TOOL_CALL_GENERATION_PROBE_COUNT
+      value: "${VECL_TRAIN_TOOL_CALL_GENERATION_PROBE_COUNT:-0}"
+    - name: VECL_TRAIN_TOOL_CALL_GENERATION_MAX_NEW_TOKENS
+      value: "${VECL_TRAIN_TOOL_CALL_GENERATION_MAX_NEW_TOKENS:-256}"
     - name: VECL_TRAIN_GCS_OUTPUT_URI
       value: "${GCS_OUTPUT_URI}"
     - name: PYTHONUNBUFFERED
       value: "1"
     - name: PIP_ROOT_USER_ACTION
       value: "ignore"
+    - name: PYTORCH_CUDA_ALLOC_CONF
+      value: "${PYTORCH_CUDA_ALLOC_CONF:-expandable_segments:True}"
 scheduling:
   timeout: 10800s
   disableRetries: true
@@ -194,6 +244,8 @@ gcloud ai custom-jobs create \
   --display-name="$DISPLAY_NAME" \
   --config="$CONFIG_YAML"
 
+rm -f -- "$CONFIG_YAML"
+
 JOB_NAME="$(gcloud ai custom-jobs list \
   --project="$PROJECT_ID" \
   --region="$REGION" \
@@ -205,8 +257,8 @@ JOB_ID="${JOB_NAME##*/}"
 
 print "Vertex custom job id: ${JOB_ID}"
 print "Training outputs: ${GCS_OUTPUT_URI}"
-print "Temporary config with HF_TOKEN: ${CONFIG_YAML}"
-print "After the job starts, delete the temporary config and unset HF_TOKEN if needed."
+print "Temporary credential-bearing config removed after submission."
+print "Unset HF_TOKEN when no longer needed."
 
 if [[ "$STREAM_LOGS" == "true" ]]; then
   gcloud ai custom-jobs stream-logs "$JOB_ID" \

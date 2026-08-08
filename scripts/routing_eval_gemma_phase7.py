@@ -6,12 +6,13 @@ import os
 import shutil
 import subprocess
 import tarfile
-import tempfile
 import urllib.request
 from collections.abc import Callable, Sequence
 from pathlib import Path
 from typing import Any
 
+from vecl._archive import extract_tar_safely
+from vecl._paths import environment_directory
 from vecl.provenance.events import EventType
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb._llm_inference import DEFAULT_ROUTING_MODEL_ID, gemma_route_once
@@ -69,8 +70,8 @@ def run_phase7_routing_eval(
 ) -> dict[str, Any]:
     if blastn_binary is None or makeblastdb_binary is None:
         blastn_binary, makeblastdb_binary = ensure_blast_plus()
-    artifact_root = artifact_root or Path(
-        os.environ.get("VECL_ARTIFACT_STORE", "/tmp/vecl-phase7-routing-artifacts")
+    artifact_root = artifact_root or environment_directory(
+        "VECL_ARTIFACT_STORE", prefix="vecl-phase7-routing-artifacts-"
     )
     db_prefix = create_phase7_blast_db(
         artifact_root / "blast-db",
@@ -229,15 +230,14 @@ def ensure_blast_plus() -> tuple[Path, Path]:
     if blastn is not None and makeblastdb is not None:
         return blastn, makeblastdb
 
-    root = Path(tempfile.gettempdir()) / "vecl-ncbi-blast-2.17"
-    root.mkdir(parents=True, exist_ok=True)
+    root = environment_directory("BLAST_DOWNLOAD_DIR", prefix="vecl-ncbi-blast-2.17-")
     archive_path = root / "ncbi-blast-2.17.0-linux.tar.gz"
     if not archive_path.exists():
         url = os.environ.get("BLAST_DOWNLOAD_URL", DEFAULT_BLAST_URL)
         print(f"Downloading NCBI BLAST+ from {url}", flush=True)
         urllib.request.urlretrieve(url, archive_path)  # noqa: S310 - official URL, env-overridable.
     with tarfile.open(archive_path) as archive:
-        archive.extractall(root)
+        extract_tar_safely(archive, root)
     downloaded_blastn = _find_downloaded_binary(root, "blastn")
     downloaded_makeblastdb = _find_downloaded_binary(root, "makeblastdb")
     return downloaded_blastn, downloaded_makeblastdb

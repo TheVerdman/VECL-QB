@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from vecl._paths import environment_directory  # noqa: E402
 from vecl.provenance.events import EventType, ProvenanceEvent, stable_hash  # noqa: E402
 from vecl.provenance.ledger import ProvenanceLedger  # noqa: E402
 from vecl.qb.model_driver import ModelDriver, resolve_model_driver  # noqa: E402
@@ -44,7 +45,9 @@ Artifact ids:
 
 def main() -> int:
     driver = resolve_model_driver()
-    store = ContentAddressedStore(Path("/tmp/vecl-tool-call-eval-artifacts"))
+    store = ContentAddressedStore(
+        environment_directory("VECL_ARTIFACT_STORE", prefix="vecl-tool-call-eval-artifacts-")
+    )
     from vecl.specialists.sympy_specialist import SymPySpecialist
 
     specialists: dict[str, Specialist] = {

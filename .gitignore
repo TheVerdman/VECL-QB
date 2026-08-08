@@ -14,3 +14,8 @@ __pycache__/
 .vecl/
 dist/
 build/
+
+# Generated training corpora. Keep one deterministic review fixture in Git.
+data/synthetic/*/corpus.jsonl
+data/synthetic/*/exports/*.jsonl
+!data/synthetic/v0-small/corpus.jsonl

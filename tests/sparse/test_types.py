@@ -40,7 +40,17 @@ def test_invalid_max_slots_rejected() -> None:
     with pytest.raises(ValueError, match="max_slots"):
         SparseMemoryInputs(**_valid_inputs(max_slots=-1))
 
+    with pytest.raises(ValueError, match="integer"):
+        SparseMemoryInputs(**_valid_inputs(max_slots=1.5))
+
+
+def test_non_finite_scalar_rejected() -> None:
+    with pytest.raises(ValueError, match="finite"):
+        SparseMemoryInputs(**_valid_inputs(learning_rate=np.nan))
+
 
 def test_invalid_quarantine_index_rejected() -> None:
     with pytest.raises(ValueError, match="quarantined"):
         SparseMemoryInputs(**_valid_inputs(quarantined_slots={2}))
+    with pytest.raises(ValueError, match="integer"):
+        SparseMemoryInputs(**_valid_inputs(quarantined_slots={0.5}))

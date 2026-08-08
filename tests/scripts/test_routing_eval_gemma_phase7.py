@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+import pytest
+
 from scripts.routing_eval_gemma_phase7 import (
     _default_fixture_path,
     blast_card,
@@ -11,6 +13,24 @@ from scripts.routing_eval_gemma_phase7 import (
     sympy_card,
 )
 from vecl.specialists.blast_specialist import resolve_blast_binary
+
+
+def _blast_available(name: str) -> bool:
+    try:
+        resolve_blast_binary(name)
+    except FileNotFoundError:
+        return False
+    return True
+
+
+_requires_makeblastdb = pytest.mark.skipif(
+    not _blast_available("makeblastdb"),
+    reason="makeblastdb is not installed; this is an optional real-tool test",
+)
+_requires_blast = pytest.mark.skipif(
+    not (_blast_available("blastn") and _blast_available("makeblastdb")),
+    reason="NCBI BLAST+ is not installed; this is an optional real-tool test",
+)
 
 
 def test_phase7_cards_describe_distinct_specialists() -> None:
@@ -23,6 +43,8 @@ def test_phase7_cards_describe_distinct_specialists() -> None:
     assert "sequence" in blast.description.lower()
 
 
+@pytest.mark.optional
+@_requires_makeblastdb
 def test_create_phase7_blast_db_uses_real_makeblastdb(tmp_path: Path) -> None:
     db_prefix = create_phase7_blast_db(
         tmp_path,
@@ -32,6 +54,8 @@ def test_create_phase7_blast_db_uses_real_makeblastdb(tmp_path: Path) -> None:
     assert db_prefix.with_suffix(".ndb").exists() or db_prefix.with_suffix(".nin").exists()
 
 
+@pytest.mark.optional
+@_requires_blast
 def test_phase7_eval_with_mock_inference_routes_and_executes_real_tools(
     tmp_path: Path,
 ) -> None:

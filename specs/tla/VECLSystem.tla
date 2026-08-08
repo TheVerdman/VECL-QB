@@ -1,6 +1,7 @@
 ---- MODULE VECLSystem ----
 EXTENDS Naturals, Sequences
 
-\* Placeholder system contract module for VECL-QB refinement work.
+\* NON-EXECUTABLE PLACEHOLDER for possible future refinement work.
+\* This module defines no state machine or invariants and is not checked by TLC.
 
 ====

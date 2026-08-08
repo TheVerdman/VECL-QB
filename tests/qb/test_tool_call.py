@@ -6,7 +6,7 @@ from typing import Any
 
 import pytest
 
-from vecl.provenance.events import EventType, stable_hash
+from vecl.provenance.events import EventType, ProvenanceEvent, stable_hash
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb.model_driver import ModelDriverResult
 from vecl.qb.router import SpecialistCard
@@ -292,6 +292,9 @@ def test_execute_tool_call_runs_validated_request_through_chain_executor(tmp_pat
     store = ContentAddressedStore(tmp_path)
     specialist = RecordingSpecialist("stockfish", "chess_eval", store)
     ledger = ProvenanceLedger()
+    parent = ledger.append(
+        ProvenanceEvent(EventType.EVIDENCE_INGESTED, "tenant", "test", {"request_id": "request"})
+    )
     proposal = ToolCallProposal(
         "stockfish",
         "chess_eval",
@@ -311,7 +314,7 @@ def test_execute_tool_call_runs_validated_request_through_chain_executor(tmp_pat
         cards={"stockfish": _card("stockfish", "chess_eval")},
         specialists={"stockfish": specialist},
         ledger=ledger,
-        config=_config(provenance_context={"parent_event_id": "evt-parent"}),
+        config=_config(provenance_context={"parent_event_id": parent.event_id}),
     )
 
     assert run.execution is not None

@@ -1,4 +1,8 @@
-# CUDA Plan
+# CUDA Plan (Not Implemented)
+
+There is no CUDA implementation in this repository. The current Python
+`sparse_update_cuda_like` function is an API scaffold that directly delegates to
+the CPU oracle; it is not independent differential evidence.
 
 CUDA is data-plane only. It may accelerate deterministic numeric operations, but it must not own trust, governance, provenance, policy, or tenant isolation authority.
 
@@ -28,4 +32,6 @@ CUDA is data-plane only. It may accelerate deterministic numeric operations, but
 - Verify deterministic tie-breaking against the CPU oracle.
 - Verify tenant and trust policy versions before commit.
 
-CUDA output must be differentially tested against the CPU oracle. Direct TLA+ to CUDA compilation is a category error; CUDA refines a contract, and host-side checks decide whether a concrete run may commit.
+Any future CUDA output must be independently and differentially tested against
+the CPU oracle. Direct TLA+ to CUDA compilation would be a category error;
+host-side checks decide whether a concrete run may commit.

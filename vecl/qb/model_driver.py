@@ -365,7 +365,7 @@ def _read_json(raw: bytes) -> dict[str, Any]:
 def _urlopen_bytes(request: urllib.request.Request, timeout: float) -> bytes:
     try:
         with urllib.request.urlopen(request, timeout=timeout) as response:  # noqa: S310
-            return response.read()
+            return bytes(response.read())
     except urllib.error.HTTPError as exc:
         body = exc.read().decode(errors="replace")[:1000]
         raise RuntimeError(f"model provider HTTP {exc.code}: {body}") from exc

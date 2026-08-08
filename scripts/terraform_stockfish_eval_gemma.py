@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 
+from vecl._paths import environment_directory
 from vecl.qb._llm_inference import (
     DEFAULT_ROUTING_MODEL_ID,
     RoutingInferenceConfig,
@@ -46,8 +47,8 @@ def main() -> int:
 
     terraform_binary = ensure_terraform_cli()
     stockfish_binary = ensure_stockfish_18()
-    artifact_root = Path(
-        os.environ.get("VECL_ARTIFACT_STORE", "/tmp/vecl-terraform-stockfish-eval-artifacts")
+    artifact_root = environment_directory(
+        "VECL_ARTIFACT_STORE", prefix="vecl-terraform-stockfish-eval-artifacts-"
     )
     stockfish = StockfishSpecialist(
         binary=stockfish_binary,

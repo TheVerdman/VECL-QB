@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sys
-from datetime import UTC, datetime
+from datetime import datetime
 from pathlib import Path
 
 import numpy as np
@@ -12,6 +12,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from vecl._compat import UTC
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.runtime.metrics import tenant_crossing_metric
 from vecl.runtime.monitor import SparseUpdateMonitor

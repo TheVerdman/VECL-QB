@@ -58,7 +58,10 @@ def gemma_route_once(prompt: str, config: RoutingInferenceConfig | None = None) 
     with torch.inference_mode():
         outputs = model.generate(**inputs, max_new_tokens=config.max_new_tokens)  # type: ignore[attr-defined]
     input_len = inputs["input_ids"].shape[-1]
-    return processor.decode(outputs[0][input_len:], skip_special_tokens=True).strip()  # type: ignore[attr-defined]
+    decoded = processor.decode(  # type: ignore[attr-defined]
+        outputs[0][input_len:], skip_special_tokens=True
+    )
+    return str(decoded).strip()
 
 
 def _load_model(config: RoutingInferenceConfig) -> tuple[object, object]:

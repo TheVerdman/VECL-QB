@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import asdict, dataclass
 from datetime import datetime, timedelta
+from math import isfinite
 from uuid import uuid4
 
 from vecl._compat import UTC
@@ -59,14 +60,24 @@ def validate_learning_event_token(
     token: LearningEventToken, now: datetime | None, expected_tenant_id: str
 ) -> bool:
     now = now or datetime.now(UTC)
-    if token.expires_at < now:
+    if now.tzinfo is None or token.created_at.tzinfo is None or token.expires_at.tzinfo is None:
+        raise ValueError("token timestamps must be timezone-aware")
+    if token.created_at > now:
+        raise ValueError("learning event token was created in the future")
+    if token.expires_at <= now:
         raise ValueError("learning event token is expired")
+    if token.expires_at <= token.created_at:
+        raise ValueError("learning event token expiration must follow creation")
     if token.tenant_id != expected_tenant_id:
         raise ValueError("learning event token tenant mismatch")
+    if not isfinite(token.min_authority) or not isfinite(token.min_score):
+        raise ValueError("token thresholds must be finite")
     if token.min_authority < 0:
         raise ValueError("min_authority must be >= 0")
     if token.min_score < 0:
         raise ValueError("min_score must be >= 0")
+    if isinstance(token.max_slots, bool) or not isinstance(token.max_slots, int):
+        raise ValueError("max_slots must be an integer")
     if token.max_slots < 0:
         raise ValueError("max_slots must be >= 0")
     if not token.source_set_hash or not token.provenance_root_hash:

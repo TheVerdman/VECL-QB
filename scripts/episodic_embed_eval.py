@@ -4,9 +4,7 @@ from __future__ import annotations
 import json
 import math
 import os
-import shutil
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -15,6 +13,7 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from vecl._paths import environment_directory  # noqa: E402
 from vecl.episodic.store import (  # noqa: E402
     CausalLMHiddenStateEmbedder,
     DeterministicEmbedder,
@@ -32,12 +31,7 @@ class EpisodicEvalConfig:
 
     @classmethod
     def from_env(cls) -> EpisodicEvalConfig:
-        root = Path(
-            os.environ.get(
-                "VECL_EPISODIC_EVAL_ROOT",
-                str(Path(tempfile.gettempdir()) / "vecl-qb-episodic-eval"),
-            )
-        )
+        root = environment_directory("VECL_EPISODIC_EVAL_ROOT", prefix="vecl-qb-episodic-eval-")
         return cls(
             embed_mode=os.environ.get("VECL_EPISODIC_EMBED_MODE", "deterministic"),
             vector_backend=os.environ.get("VECL_EPISODIC_VECTOR_BACKEND", "local"),
@@ -47,9 +41,7 @@ class EpisodicEvalConfig:
 
 def main() -> int:
     config = EpisodicEvalConfig.from_env()
-    if config.root.exists():
-        shutil.rmtree(config.root)
-    config.root.mkdir(parents=True)
+    config.root.mkdir(parents=True, exist_ok=True)
     embedder = _build_embedder(config.embed_mode)
     store = _build_store(config, embedder)
 

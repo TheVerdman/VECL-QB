@@ -1,8 +1,10 @@
-from datetime import UTC, datetime
+from datetime import datetime, timedelta
+from unittest.mock import patch
 
 import numpy as np
 import pytest
 
+from vecl._compat import UTC
 from vecl.provenance.events import EventType
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.runtime.monitor import SparseUpdateMonitor
@@ -79,8 +81,66 @@ def test_abort_on_tampered_selected_slots() -> None:
         monitor.verify_sparse_update(token, inputs, result)
 
 
+def test_rejects_selected_slot_count_above_token_authorization() -> None:
+    monitor = SparseUpdateMonitor(ProvenanceLedger())
+    token = _token(max_slots=1)
+    inputs = SparseMemoryInputs(
+        memory_values=np.array([1.0, 1.0]),
+        gradients=np.array([1.0, 1.0]),
+        activation=np.array([1.0, 1.0]),
+        rarity=np.array([1.0, 1.0]),
+        authority=np.array([1.0, 1.0]),
+        learning_rate=0.1,
+        min_authority=0.1,
+        min_score=0.1,
+        max_slots=1,
+        quarantined_slots=set(),
+    )
+    result = monitor.apply_sparse_update(token, inputs)
+    result.selected_slots.append(1)
+
+    with pytest.raises(ValueError, match="selected slot count exceeds max_slots"):
+        monitor.verify_sparse_update(token, inputs, result)
+
+
 def test_abort_on_token_threshold_mismatch() -> None:
     monitor = SparseUpdateMonitor(ProvenanceLedger())
     token = _token(min_authority=0.5)
     with pytest.raises(ValueError, match="thresholds"):
         monitor.apply_sparse_update(token, _inputs(min_authority=0.1))
+
+
+def test_commit_revalidates_learning_event_token_expiry() -> None:
+    started_at = datetime(2026, 1, 1, tzinfo=UTC)
+    token = create_learning_event_token(
+        batch_id="b",
+        tenant_id="t",
+        source_set_hash="sources",
+        provenance_root_hash="root",
+        min_authority=0.1,
+        min_score=0.1,
+        max_slots=1,
+        policy_version="p",
+        trust_policy_version="tp",
+        ttl_seconds=1,
+        now=started_at,
+    )
+    monitor = SparseUpdateMonitor(ProvenanceLedger())
+
+    with patch("vecl.runtime.monitor.datetime") as mocked_datetime:
+        mocked_datetime.now.return_value = started_at
+        monitor.apply_sparse_update(token, _inputs())
+        mocked_datetime.now.return_value = started_at + timedelta(seconds=2)
+        with pytest.raises(ValueError, match="expired"):
+            monitor.commit_learning_event(token)
+
+
+def test_commit_rejects_extra_payload_that_overrides_provenance_fields() -> None:
+    monitor = SparseUpdateMonitor(ProvenanceLedger())
+    token = _token()
+    monitor.apply_sparse_update(token, _inputs())
+
+    with pytest.raises(ValueError, match="reserved"):
+        monitor.commit_learning_event(token, extra_payload={"memory_hash": "forged"})
+
+    assert not monitor.ledger.find_by_type(EventType.SPARSE_UPDATE_APPLIED)

@@ -24,6 +24,7 @@ from vecl.training.tool_use_loop import (
     _report_probe_metrics,
     dataset_hash,
     snapshot_file_hash,
+    supervised_loss_for_example,
     validate_training_examples,
 )
 
@@ -210,6 +211,23 @@ def test_tool_use_trainer_commits_lora_sparse_update(tmp_path: Path) -> None:
             assert torch.allclose(before_base[name], parameter.detach())
 
 
+def test_tool_use_trainer_uses_training_prompt_builder(tmp_path: Path) -> None:
+    trainer, _substrate, _ledger = _trainer(tmp_path)
+    example = stockfish_tool_use_examples()[0]
+
+    trainer.training_prompt_builder = lambda item: f"wrapped::{item.prompt}"
+
+    assert trainer._training_prompt(example).startswith("wrapped::")
+    loss = supervised_loss_for_example(
+        model=trainer.model,
+        processor=trainer.processor,
+        example=example,
+        torch=torch,
+        training_prompt_builder=trainer.training_prompt_builder,
+    )
+    assert torch.isfinite(loss)
+
+
 def test_tool_use_trainer_aborts_and_restores_on_lora_apply_failure(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
@@ -296,6 +314,75 @@ def test_tool_use_trainer_reports_ewc_penalty_and_drift(tmp_path: Path) -> None:
     assert applied.payload["ewc_penalty_value"] == report.ewc_penalty_value
     assert applied.payload["ewc_approved_snapshot_hash"] == report.ewc_approved_snapshot_hash
     assert applied.payload["ewc_drift_report"]["drift_within_bound"] is True
+    accepted = ledger.find_by_type(EventType.LEARNING_CANDIDATE_ACCEPTED)
+    assert accepted
+    assert accepted[0].payload["candidate_snapshot_hash"] == report.candidate_snapshot_hash
+
+
+def test_tool_use_trainer_rejects_over_bound_candidate_and_restores(tmp_path: Path) -> None:
+    trainer, substrate, ledger = _trainer(tmp_path)
+    approved_path = tmp_path / "approved-fisher.npz"
+    substrate.snapshot(
+        approved_path,
+        fisher_diagonal=np.ones(substrate.slot_count, dtype=np.float64),
+        fisher_metadata={
+            "fisher_status": "accumulated",
+            "sample_count": 1,
+            "dataset_hash": "test",
+            "loss_sum": 1.0,
+        },
+    )
+    before = substrate.flatten().copy()
+    trainer.config = ToolUseTrainingConfig(
+        min_score=0.0,
+        learning_rate=0.01,
+        ewc_lambda=0.1,
+        ewc_drift_threshold=0.0,
+    )
+    trainer.ewc_approved_snapshot_path = approved_path
+
+    report = trainer.run_cycle(stockfish_tool_use_examples())
+
+    assert report.committed is False
+    assert report.candidate_decision == "rejected_drift_exceeded"
+    assert report.ewc_drift_report is not None
+    assert report.ewc_drift_report["drift_within_bound"] is False
+    assert report.restored_snapshot_hash == report.start_snapshot_hash
+    assert Path(report.after_snapshot_path).exists()
+    assert report.after_snapshot_hash != report.before_snapshot_hash
+    assert np.allclose(substrate.flatten(), before)
+    assert not ledger.find_by_type(EventType.SPARSE_UPDATE_APPLIED)
+    assert not ledger.find_by_type(EventType.LEARNING_EVENT_COMMITTED)
+    assert ledger.find_by_type(EventType.LEARNING_EVENT_ABORTED)
+    assert ledger.find_by_type(EventType.LEARNING_CANDIDATE_PREPARED)
+    assert ledger.find_by_type(EventType.LEARNING_CANDIDATE_EVALUATED)
+    rejected = ledger.find_by_type(EventType.LEARNING_CANDIDATE_REJECTED)
+    assert rejected
+    assert rejected[0].payload["candidate_quarantined"] is True
+    restored = ledger.find_by_type(EventType.LEARNING_CANDIDATE_RESTORED)
+    assert restored
+    assert restored[0].payload["restored_snapshot_hash"] == report.start_snapshot_hash
+
+
+def test_ewc_approved_snapshot_hash_mismatch_is_rejected(tmp_path: Path) -> None:
+    trainer, substrate, _ledger = _trainer(tmp_path)
+    approved_path = tmp_path / "approved-fisher.npz"
+    substrate.snapshot(
+        approved_path,
+        fisher_diagonal=np.ones(substrate.slot_count, dtype=np.float64),
+        fisher_metadata={
+            "fisher_status": "accumulated",
+            "sample_count": 1,
+            "dataset_hash": "test",
+            "loss_sum": 1.0,
+        },
+    )
+    trainer.config = ToolUseTrainingConfig(ewc_lambda=0.1)
+    trainer.ewc_approved_snapshot_path = approved_path
+    trainer.expected_ewc_approved_snapshot_hash = "not-the-right-hash"
+
+    with pytest.raises(ValueError, match="approved snapshot hash"):
+        trainer.run_cycle(stockfish_tool_use_examples())
 
 
 def test_ewc_penalty_requires_approved_snapshot(tmp_path: Path) -> None:

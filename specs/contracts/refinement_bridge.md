@@ -1,8 +1,10 @@
-# Refinement Bridge
+# Planned Refinement Bridge
 
-This document maps abstract TLA+ state to production state for engineers who know either formal specs or production systems.
+This document records a proposed mapping between a future executable TLA+ model
+and production state. No such executable model or TLC configuration is currently
+implemented in this repository.
 
-## State Mapping
+## Intended State Mapping
 
 - TLA `memoryValues` maps to production `memory_values`.
 - TLA `memoryScores` maps to sparse `scores`.
@@ -12,7 +14,7 @@ This document maps abstract TLA+ state to production state for engineers who kno
 - TLA `sourceTrust` maps to `TrustAnchorRegistry` plus `BoundedTrustUpdater`.
 - TLA sleep-cycle state maps to `SleepCycleReport`.
 
-## Refinement Idea
+## Intended Refinement Shape
 
 For every concrete production learning event, there exists a sequence of abstract transitions:
 
@@ -24,12 +26,21 @@ PrepareLearningEvent
 -> CommitLearningEvent
 ```
 
-The production implementation may have more bookkeeping, hashes, timestamps, and audit fields, but it must preserve the abstract transition order and invariants.
+If executable models are added, production traces should preserve this abstract
+transition order. Today, this ordering is checked by Python tests and runtime
+validation rather than by TLC.
 
-## Invariant Coverage
+## Current Executable Coverage
 
-- TLC checks abstract transition invariants and counterexamples.
 - Unit tests check concrete edge cases and data validation.
 - Property tests check broad input spaces and architectural failure modes.
 - Runtime monitor checks the concrete update before commit.
-- Release gate checks promoted checkpoints against invariants, regressions, adversarial simulations, rollback, verification calibration, and tenant isolation.
+- Provenance ledgers verify payload and chain integrity.
+- The release gate requires complete, evidence-producing evaluator results before
+  approval.
+
+## Not Implemented
+
+- TLA+ variables, initial states, next-state relations, or invariants.
+- TLC model configuration and state-space exploration.
+- CI model checking or trace-refinement comparison against a TLA+ model.

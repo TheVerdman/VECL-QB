@@ -5,7 +5,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from vecl.qb.claim_graph import ClaimGraph
-from vecl.sparse.types import SparseMemoryInputs, SparseUpdateResult
+from vecl.sparse.types import FloatArray, SparseMemoryInputs, SparseUpdateResult
 
 
 @dataclass
@@ -35,8 +35,8 @@ def adversarial_metrics(
     adversarial_source_id: str,
     replay_source_ids: list[str],
     selected_source_ids: list[str],
-    memory_before: np.ndarray,
-    memory_after: np.ndarray,
+    memory_before: FloatArray,
+    memory_after: FloatArray,
     trust_before: float,
     trust_after: float,
 ) -> dict[str, float]:
@@ -67,7 +67,7 @@ def claim_graph_metrics(claim_graph: ClaimGraph, verifier_statuses: list[str]) -
     }
 
 
-def rollback_metrics(expected: np.ndarray, actual: np.ndarray) -> dict[str, float]:
+def rollback_metrics(expected: FloatArray, actual: FloatArray) -> dict[str, float]:
     return {"rollback_error_norm": float(np.linalg.norm(actual - expected))}
 
 

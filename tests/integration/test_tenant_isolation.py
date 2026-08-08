@@ -1,8 +1,9 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 import numpy as np
 import pytest
 
+from vecl._compat import UTC
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.runtime.checkpoints import CheckpointStore, RollbackService
 from vecl.runtime.monitor import SparseUpdateMonitor

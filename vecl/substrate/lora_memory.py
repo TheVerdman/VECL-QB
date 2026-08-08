@@ -6,7 +6,7 @@ import re
 from collections.abc import Iterable, Mapping, Sequence
 from dataclasses import asdict, dataclass
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 from numpy.typing import NDArray
@@ -261,6 +261,7 @@ class LoRAMemorySubstrate:
         modules = self._unique_modules()
         metadata = self._snapshot_metadata()
         arrays: dict[str, NDArray[Any]] = {"metadata_json": np.array(json.dumps(metadata))}
+        fisher: FloatArray
         if fisher_diagonal is None:
             fisher = np.zeros(self.slot_count, dtype=np.float64)
             fisher_payload = {"fisher_status": "not_accumulated", "sample_count": 0}
@@ -563,7 +564,7 @@ def _component_hash(lora_a_row: Any, lora_b_column: Any) -> str:
 
 
 def _tensor_to_numpy(tensor: Any) -> NDArray[Any]:
-    return tensor.detach().cpu().contiguous().numpy()
+    return cast(NDArray[Any], tensor.detach().cpu().contiguous().numpy())
 
 
 def _snapshot_fisher_diagonal(snapshot: Any, slot_count: int) -> FloatArray:
