@@ -33,7 +33,7 @@ from vecl.training.corpus_schema import (
     supervised_examples_from_corpus,
 )
 
-SYNTHETIC_TERRAFORM_CONFIG_DIR = "/tmp/vecl-qb-synthetic-terraform-fixture"
+SYNTHETIC_TERRAFORM_CONFIG_DIR = "fixtures/terraform"
 
 IssueSeverity = Literal["error", "warning"]
 

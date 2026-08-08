@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import Any
 
 from vecl._gemma import has_allowed_cuda_device, resolve_gemma_model_class, resolve_torch_dtype
+from vecl._paths import environment_directory
 from vecl.provenance.events import EventType, stable_hash
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb.router import SpecialistCard
@@ -82,8 +83,7 @@ def main() -> int:
         raise ValueError(
             "VECL_TRAIN_DIAGNOSTIC_MODE must be empty, tiny_overfit, or sparse_overfit"
         )
-    output_dir = Path(os.environ.get("VECL_TRAIN_OUTPUT_DIR", "/tmp/vecl-tool-use-train"))
-    output_dir.mkdir(parents=True, exist_ok=True)
+    output_dir = environment_directory("VECL_TRAIN_OUTPUT_DIR", prefix="vecl-tool-use-train-")
 
     processor = AutoProcessor.from_pretrained(model_id, token=token)
     model_kwargs: dict[str, Any] = {"device_map": device_map, "token": token}
@@ -581,8 +581,11 @@ def _tiny_overfit_diagnostic(
     validation_config = ToolCallValidationConfig(
         tenant_id="tiny-overfit-diagnostic",
         request_id="tiny-overfit-diagnostic",
-        terraform_config_dir=os.environ.get(
-            "VECL_TRAIN_TERRAFORM_CONFIG_DIR", "/tmp/vecl-terraform-fixture"
+        terraform_config_dir=os.environ.get("VECL_TRAIN_TERRAFORM_CONFIG_DIR")
+        or str(
+            environment_directory(
+                "VECL_TRAIN_TERRAFORM_CONFIG_DIR", prefix="vecl-terraform-fixture-"
+            )
         ),
     )
     before_generation_rows = (
@@ -1000,8 +1003,11 @@ def _tool_call_generation_probe(
     validation_config = ToolCallValidationConfig(
         tenant_id="tool-call-generation-probe",
         request_id="tool-call-generation-probe",
-        terraform_config_dir=os.environ.get(
-            "VECL_TRAIN_TERRAFORM_CONFIG_DIR", "/tmp/vecl-terraform-fixture"
+        terraform_config_dir=os.environ.get("VECL_TRAIN_TERRAFORM_CONFIG_DIR")
+        or str(
+            environment_directory(
+                "VECL_TRAIN_TERRAFORM_CONFIG_DIR", prefix="vecl-terraform-fixture-"
+            )
         ),
     )
 

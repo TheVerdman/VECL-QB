@@ -2,6 +2,10 @@
 
 ## Context
 
+> Historical record: cloud project and bucket names have been replaced with
+> `REDACTED_ARTIFACT_BUCKET`. Object paths, run timestamps, hashes, and outcomes are retained
+> so the research sequence remains intelligible without publishing environment identifiers.
+
 On May 21, 2026, VECL-QB crossed from specialist orchestration and release
 plumbing into the first real 31B LoRA training update. The work did not change
 the platform thesis from ADR-011: Gemma base weights remain frozen, specialists
@@ -177,7 +181,7 @@ The job wrote:
 The GCS output prefix was:
 
 ```text
-gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260521-184707
+gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260521-184707
 ```
 
 The summary showed:
@@ -221,7 +225,7 @@ The first expanded run used:
 
 - Vertex job id: `1571657021848027136`;
 - GCS output prefix:
-  `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260521-222420`;
+  `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260521-222420`;
 - torch seed: `1234`;
 - sample seed: `1107`;
 - sample count: 128;
@@ -254,7 +258,7 @@ the torch seed:
 
 - Vertex job id: `4342144848866836480`;
 - GCS output prefix:
-  `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260521-225301`;
+  `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260521-225301`;
 - torch seed: `4321`;
 - sample seed: `1107`;
 - dataset hash:
@@ -325,7 +329,7 @@ Phase 11a.4 added the missing approved-baseline shape before Phase 11b EWC:
 The first `tool_use_v0` baseline is:
 
 ```text
-uri: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-lora.npz
+uri: gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-lora.npz
 hash: b733d830f0de1b98be56dad60e92938f20b170e214302362ba06ae9bbf9a428e
 model_id: google/gemma-4-31B-it
 rank: 8
@@ -338,7 +342,7 @@ The larger Vertex proof then ran from that baseline shape:
 ```text
 job_id: 6756214986625777664
 state: JOB_STATE_SUCCEEDED
-output: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260521-235325
+output: gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260521-235325
 sample_count: 1024
 slot_count: 64
 selected_slot_count: 8
@@ -399,9 +403,9 @@ measurement and training-time regularization:
 The canonical Fisher-bearing `tool_use_v0` baseline is:
 
 ```text
-uri: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
+uri: gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
 hash: 465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
-summary: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher-summary.json
+summary: gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher-summary.json
 ```
 
 The Fisher Vertex run was:
@@ -409,7 +413,7 @@ The Fisher Vertex run was:
 ```text
 job_id: 2595223182470283264
 state: JOB_STATE_SUCCEEDED
-output: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/fisher-eval/20260522-004917
+output: gs://REDACTED_ARTIFACT_BUCKET/fisher-eval/20260522-004917
 model_id: google/gemma-4-31B-it
 torch_seed: 1234
 sample_count: 4
@@ -437,7 +441,7 @@ baseline:
 ```text
 job_id: 1016148563123503104
 state: JOB_STATE_SUCCEEDED
-output: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260522-011020
+output: gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260522-011020
 model_id: google/gemma-4-31B-it
 sample_count: 128
 slot_count: 64
@@ -527,7 +531,7 @@ The deliberate over-bound Vertex proof then ran successfully:
 
 - Vertex job id: `6396738456017436672`;
 - GCS output prefix:
-  `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-181320`;
+  `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-181320`;
 - model id: `google/gemma-4-31B-it`;
 - sample count: `64`;
 - slot count: `64`;
@@ -558,7 +562,7 @@ training drift floor from the same fixed `tool_use_v0` baseline:
 
 - Vertex job id: `7638148656427696128`;
 - GCS output prefix:
-  `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-185349`;
+  `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-185349`;
 - model id: `google/gemma-4-31B-it`;
 - sample count: `1024`;
 - slot count: `64`;
@@ -631,10 +635,10 @@ The job ids and outputs were:
 
 | Sample Count | Job ID | Output Prefix |
 | ---: | --- | --- |
-| 1024 | `7523447603418103808` | `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-202145` |
-| 2048 | `1888881519624192000` | `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-205434` |
-| 4096 | `4650432516132438016` | `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-210331` |
-| 8192 | `4055957365319532544` | `gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-210420` |
+| 1024 | `7523447603418103808` | `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-202145` |
+| 2048 | `1888881519624192000` | `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-205434` |
+| 4096 | `4650432516132438016` | `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-210331` |
+| 8192 | `4055957365319532544` | `gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-210420` |
 
 All four jobs succeeded and preserved the structural invariants:
 
@@ -710,7 +714,7 @@ The CE-only rerun then succeeded:
 
 ```text
 job_id: 2475123527368310784
-output: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-224530
+output: gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-224530
 model_id: google/gemma-4-31B-it
 baseline_snapshot_hash: 465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
 training_prompt_mode: tool_call_author
@@ -739,7 +743,7 @@ dense optimizer steps:
 
 ```text
 job_id: 8424800847589801984
-output: gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/tool-use-training/20260525-233642
+output: gs://REDACTED_ARTIFACT_BUCKET/tool-use-training/20260525-233642
 model_id: google/gemma-4-31B-it
 baseline_snapshot_hash: 465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
 training_prompt_mode: tool_call_author

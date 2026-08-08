@@ -1,9 +1,9 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-project-49b1b523-d248-434f-bd4}"
+PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID to your Google Cloud project}"
 REGION="${REGION:-us-central1}"
-BUCKET="${BUCKET:-gs://${PROJECT_ID}-vecl-qb-artifacts}"
+BUCKET="${BUCKET:?Set BUCKET to an existing gs:// bucket}"
 JOB_TS="$(date +%Y%m%d-%H%M%S)"
 VECL_TRAIN_MODEL_ID="${VECL_TRAIN_MODEL_ID:-google/gemma-4-31B-it}"
 STREAM_LOGS="${STREAM_LOGS:-true}"
@@ -13,9 +13,12 @@ if [[ -z "${HF_TOKEN:-}" ]]; then
   exit 2
 fi
 
-PKG_DIR="/tmp/vecl-qb-tool-use-train-${JOB_TS}"
-PACKAGE_TGZ="/tmp/vecl-qb-tool-use-train-${JOB_TS}.tar.gz"
-CONFIG_YAML="/tmp/vecl-qb-tool-use-train-${JOB_TS}.yaml"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vecl-qb-job.XXXXXX")"
+cleanup() { rm -rf -- "$WORK_DIR"; }
+trap cleanup EXIT
+PKG_DIR="$WORK_DIR/package"
+PACKAGE_TGZ="$WORK_DIR/vecl-qb-tool-use-train-${JOB_TS}.tar.gz"
+CONFIG_YAML="$WORK_DIR/job.yaml"
 DISPLAY_NAME="vecl-qb-gemma-tool-use-train-${JOB_TS}"
 GCS_OUTPUT_URI="${BUCKET}/tool-use-training/${JOB_TS}"
 LOCAL_CORPUS_EXPORT_DIR="${VECL_TRAIN_CORPUS_EXPORT_DIR:-data/synthetic/v1-hard/exports}"
@@ -241,6 +244,8 @@ gcloud ai custom-jobs create \
   --display-name="$DISPLAY_NAME" \
   --config="$CONFIG_YAML"
 
+rm -f -- "$CONFIG_YAML"
+
 JOB_NAME="$(gcloud ai custom-jobs list \
   --project="$PROJECT_ID" \
   --region="$REGION" \
@@ -252,8 +257,8 @@ JOB_ID="${JOB_NAME##*/}"
 
 print "Vertex custom job id: ${JOB_ID}"
 print "Training outputs: ${GCS_OUTPUT_URI}"
-print "Temporary config with HF_TOKEN: ${CONFIG_YAML}"
-print "After the job starts, delete the temporary config and unset HF_TOKEN if needed."
+print "Temporary credential-bearing config removed after submission."
+print "Unset HF_TOKEN when no longer needed."
 
 if [[ "$STREAM_LOGS" == "true" ]]; then
   gcloud ai custom-jobs stream-logs "$JOB_ID" \

@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 import sys
-import tempfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[2]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+from vecl._paths import environment_directory
 from vecl.provenance.events import EventType
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb.orchestrator import QBOrchestrator
@@ -22,7 +22,9 @@ STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 
 def build_orchestrator(artifact_dir: Path | None = None) -> QBOrchestrator:
-    artifact_root = artifact_dir or Path(tempfile.gettempdir()) / "vecl-stockfish-demo-artifacts"
+    artifact_root = artifact_dir or environment_directory(
+        "VECL_ARTIFACT_STORE", prefix="vecl-stockfish-demo-artifacts-"
+    )
     specialist = StockfishSpecialist(artifact_store=ContentAddressedStore(artifact_root))
     trust_anchor = create_stockfish_trust_anchor(specialist.binary, "Stockfish 18")
     router = QBRouter(max_specialists=1)

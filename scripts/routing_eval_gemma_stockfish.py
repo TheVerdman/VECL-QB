@@ -6,10 +6,11 @@ import os
 import shutil
 import subprocess
 import tarfile
-import tempfile
 import urllib.request
 from pathlib import Path
 
+from vecl._archive import extract_tar_safely
+from vecl._paths import environment_directory
 from vecl.provenance.events import EventType
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb._llm_inference import DEFAULT_ROUTING_MODEL_ID
@@ -39,7 +40,7 @@ def main() -> int:
         return 2
 
     stockfish_binary = ensure_stockfish_18()
-    artifact_root = Path(os.environ.get("VECL_ARTIFACT_STORE", "/tmp/vecl-routing-artifacts"))
+    artifact_root = environment_directory("VECL_ARTIFACT_STORE", prefix="vecl-routing-artifacts-")
     ledger = ProvenanceLedger()
     router = PromptedLLMRouter(ledger=ledger, model_id=model_id)
     specialist = StockfishSpecialist(
@@ -123,15 +124,14 @@ def ensure_stockfish_18() -> Path:
         if _is_stockfish_18(candidate):
             return candidate
 
-    root = Path(tempfile.gettempdir()) / "vecl-stockfish-18"
-    root.mkdir(parents=True, exist_ok=True)
+    root = environment_directory("STOCKFISH_DOWNLOAD_DIR", prefix="vecl-stockfish-18-")
     archive_path = root / "stockfish-18.tar"
     if not archive_path.exists():
         url = os.environ.get("STOCKFISH_DOWNLOAD_URL", DEFAULT_STOCKFISH_URL)
         print(f"Downloading Stockfish 18 from {url}", flush=True)
         urllib.request.urlretrieve(url, archive_path)  # noqa: S310 - official URL, overridable by env.
     with tarfile.open(archive_path) as archive:
-        archive.extractall(root)
+        extract_tar_safely(archive, root)
     for path in sorted(root.rglob("*")):
         if path.is_file() and "stockfish" in path.name.lower():
             path.chmod(path.stat().st_mode | 0o755)

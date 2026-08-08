@@ -5,7 +5,6 @@ import json
 import os
 import platform
 import re
-import tempfile
 import urllib.request
 import zipfile
 from collections.abc import Callable, Sequence
@@ -13,6 +12,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from vecl._archive import extract_zip_safely
+from vecl._paths import environment_directory
 from vecl.ethics import EthicsKernel, default_ethics_rules
 from vecl.provenance.events import EventType, ProvenanceEvent
 from vecl.provenance.ledger import ProvenanceLedger, SqliteProvenanceLedger
@@ -132,8 +133,8 @@ def run_terraform_eval(
     stockfish_specialist: Specialist | None = None,
     ledger_path: Path | None = None,
 ) -> dict[str, Any]:
-    artifact_root = artifact_root or Path(
-        os.environ.get("VECL_ARTIFACT_STORE", "/tmp/vecl-terraform-eval-artifacts")
+    artifact_root = artifact_root or environment_directory(
+        "VECL_ARTIFACT_STORE", prefix="vecl-terraform-eval-artifacts-"
     )
     store = ContentAddressedStore(artifact_root / "artifacts")
     config_dir = create_tiny_terraform_config(artifact_root / "terraform-config")
@@ -524,7 +525,9 @@ def ensure_terraform_cli() -> str:
         pass
     version = os.environ.get("VECL_TERRAFORM_VERSION", DEFAULT_TERRAFORM_VERSION)
     os_name, arch = _terraform_platform()
-    root = Path(tempfile.gettempdir()) / f"vecl-terraform-{version}-{os_name}-{arch}"
+    root = environment_directory(
+        "TERRAFORM_DOWNLOAD_DIR", prefix=f"vecl-terraform-{version}-{os_name}-{arch}-"
+    )
     binary = root / "terraform"
     if binary.exists() and os.access(binary, os.X_OK):
         return str(binary)
@@ -537,7 +540,7 @@ def ensure_terraform_cli() -> str:
     print(f"Downloading Terraform {version} from {url}", flush=True)
     urllib.request.urlretrieve(url, archive)  # noqa: S310 - official release URL.
     with zipfile.ZipFile(archive) as zipped:
-        zipped.extractall(root)
+        extract_zip_safely(zipped, root)
     binary.chmod(binary.stat().st_mode | 0o755)
     return str(binary)
 

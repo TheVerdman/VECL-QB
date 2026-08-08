@@ -1,9 +1,9 @@
 #!/usr/bin/env zsh
 set -euo pipefail
 
-PROJECT_ID="${PROJECT_ID:-project-49b1b523-d248-434f-bd4}"
+PROJECT_ID="${PROJECT_ID:?Set PROJECT_ID to your Google Cloud project}"
 REGION="${REGION:-us-central1}"
-BUCKET="${BUCKET:-gs://${PROJECT_ID}-vecl-qb-artifacts}"
+BUCKET="${BUCKET:?Set BUCKET to an existing gs:// bucket}"
 JOB_TS="$(date +%Y%m%d-%H%M%S)"
 VECL_ROUTING_MODEL_ID="${VECL_ROUTING_MODEL_ID:-google/gemma-4-31B-it}"
 VECL_ROUTING_MAX_NEW_TOKENS="${VECL_ROUTING_MAX_NEW_TOKENS:-192}"
@@ -15,9 +15,12 @@ if [[ -z "${HF_TOKEN:-}" ]]; then
   exit 2
 fi
 
-PKG_DIR="/tmp/vecl-qb-terraform-stockfish-eval-${JOB_TS}"
-PACKAGE_TGZ="/tmp/vecl-qb-terraform-stockfish-eval-${JOB_TS}.tar.gz"
-CONFIG_YAML="/tmp/vecl-qb-terraform-stockfish-eval-${JOB_TS}.yaml"
+WORK_DIR="$(mktemp -d "${TMPDIR:-/tmp}/vecl-qb-job.XXXXXX")"
+cleanup() { rm -rf -- "$WORK_DIR"; }
+trap cleanup EXIT
+PKG_DIR="$WORK_DIR/package"
+PACKAGE_TGZ="$WORK_DIR/vecl-qb-terraform-stockfish-eval-${JOB_TS}.tar.gz"
+CONFIG_YAML="$WORK_DIR/job.yaml"
 DISPLAY_NAME="vecl-qb-gemma-terraform-stockfish-eval-${JOB_TS}"
 
 mkdir -p "$PKG_DIR/terraform_stockfish_eval_job"
@@ -122,6 +125,8 @@ gcloud ai custom-jobs create \
   --display-name="$DISPLAY_NAME" \
   --config="$CONFIG_YAML"
 
+rm -f -- "$CONFIG_YAML"
+
 JOB_NAME="$(gcloud ai custom-jobs list \
   --project="$PROJECT_ID" \
   --region="$REGION" \
@@ -132,8 +137,8 @@ JOB_NAME="$(gcloud ai custom-jobs list \
 JOB_ID="${JOB_NAME##*/}"
 
 print "Vertex custom job id: ${JOB_ID}"
-print "Temporary config with HF_TOKEN: ${CONFIG_YAML}"
-print "After the job starts, delete the temporary config and unset HF_TOKEN."
+print "Temporary credential-bearing config removed after submission."
+print "Unset HF_TOKEN when no longer needed."
 
 if [[ "$STREAM_LOGS" == "true" ]]; then
   gcloud ai custom-jobs stream-logs "$JOB_ID" \

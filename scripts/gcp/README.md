@@ -2,24 +2,19 @@
 
 Use this after GPU quota is approved. Keep tokens in the VM environment or a VM-local `.env`; never commit them.
 
-## Local Project
+## Required local configuration
 
-The current GCP project is:
+The submission scripts have no baked-in cloud project or bucket. Export both explicitly:
 
-```text
-project-49b1b523-d248-434f-bd4
+```bash
+export PROJECT_ID=your-project-id
+export BUCKET=gs://your-existing-artifact-bucket
 ```
 
-Default region and zone:
+The default region is `us-central1`; override it with `REGION`. These scripts create billable
+Vertex jobs and must only be run deliberately against an authorized project.
 
-```text
-us-central1
-us-central1-a
-```
-
-## Approved GPU Path
-
-The project currently has quota for one `A100 80GB` GPU in `us-central1`. H100 and B200 were requested but not approved for the first pass.
+## GPU path
 
 `scripts/smoke_gemma.py` accepts A100 and H100 CUDA devices by default. To override the check:
 
@@ -36,20 +31,19 @@ export HF_TOKEN=...
 zsh scripts/gcp/submit_vertex_gemma_smoke.sh
 ```
 
-The submit script packages `scripts/smoke_gemma.py`, launches one A100 80GB Vertex
-custom training job, and streams logs. The temporary job YAML contains `HF_TOKEN`;
-delete the printed `/tmp/vecl-qb-a100-smoke-*.yaml` file after launch and revoke the
-token after the smoke run if it has been exposed.
+The submit script packages `scripts/smoke_gemma.py`, launches one A100 80GB Vertex custom
+training job, and streams logs. It creates files under a private `mktemp` directory and removes
+the credential-bearing job YAML immediately after submission; unset or rotate `HF_TOKEN` when
+it is no longer needed.
 
 If running manually on a GPU VM instead of Vertex:
 
 ```bash
 nvidia-smi
-python3.12 -m venv .venv
-.venv/bin/python -m pip install -e ".[dev]"
-make all
+uv sync --frozen
+uv run make check PYTHON="uv run python"
 export HF_TOKEN=...
-.venv/bin/python scripts/smoke_gemma.py
+uv run python scripts/smoke_gemma.py
 ```
 
 Expected result: `scripts/smoke_gemma.py` prints the model id, prompt, and a coherent generated response.
@@ -252,7 +246,7 @@ export HF_TOKEN=...
 export VECL_FISHER_MODEL_ID=google/gemma-4-31B-it
 export VECL_FISHER_LORA_RANK=8
 export VECL_FISHER_LAST_N_LAYERS=8
-export VECL_FISHER_BASELINE_SNAPSHOT_URI=gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-lora.npz
+export VECL_FISHER_BASELINE_SNAPSHOT_URI=gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-lora.npz
 export VECL_FISHER_BASELINE_SNAPSHOT_HASH=b733d830f0de1b98be56dad60e92938f20b170e214302362ba06ae9bbf9a428e
 zsh scripts/gcp/submit_vertex_fisher_eval.sh
 ```
@@ -267,14 +261,14 @@ artificially perturbed candidate. The job prints `FISHER_EVAL_SUMMARY`.
 Current canonical Fisher-bearing `tool_use_v0` baseline:
 
 ```bash
-export VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
+export VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
 export VECL_TRAIN_BASELINE_SNAPSHOT_HASH=465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
 ```
 
 Its audit summary is stored at:
 
 ```text
-gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher-summary.json
+gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher-summary.json
 ```
 
 ## Phase 11a Tool-Use Training Eval
@@ -324,7 +318,7 @@ baseline inside the worker.
 Current canonical `tool_use_v0` baseline:
 
 ```bash
-export VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-lora.npz
+export VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-lora.npz
 export VECL_TRAIN_BASELINE_SNAPSHOT_HASH=b733d830f0de1b98be56dad60e92938f20b170e214302362ba06ae9bbf9a428e
 ```
 
@@ -332,9 +326,9 @@ For Phase 11b EWC training, use the Fisher-bearing baseline snapshot above,
 then set:
 
 ```bash
-export VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
+export VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
 export VECL_TRAIN_BASELINE_SNAPSHOT_HASH=465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
-export VECL_TRAIN_EWC_APPROVED_SNAPSHOT_URI=gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
+export VECL_TRAIN_EWC_APPROVED_SNAPSHOT_URI=gs://REDACTED_ARTIFACT_BUCKET/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
 export VECL_TRAIN_EWC_APPROVED_SNAPSHOT_HASH=465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
 export VECL_TRAIN_EWC_LAMBDA=0.1
 export VECL_TRAIN_EWC_DRIFT_THRESHOLD=1.0
