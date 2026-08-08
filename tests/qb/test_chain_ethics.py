@@ -3,7 +3,7 @@ from __future__ import annotations
 import pytest
 
 from vecl.ethics import EthicsKernel, default_ethics_rules
-from vecl.provenance.events import EventType
+from vecl.provenance.events import EventType, ProvenanceEvent
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb.chain_executor import ChainExecutor
 from vecl.qb.planner import ChainPlan, ChainStep
@@ -41,14 +41,19 @@ def _kernel(monkeypatch: pytest.MonkeyPatch, ledger: ProvenanceLedger) -> Ethics
     return kernel
 
 
-def _request(input_payload: dict[str, object] | None = None) -> SpecialistRequest:
+def _request(
+    ledger: ProvenanceLedger, input_payload: dict[str, object] | None = None
+) -> SpecialistRequest:
+    parent = ledger.append(
+        ProvenanceEvent(EventType.EVIDENCE_INGESTED, "tenant-a", "test", {"request_id": "req"})
+    )
     return SpecialistRequest(
         "req",
         "tenant-a",
         "ethics_test",
         input_payload or {},
         {},
-        {"parent_event_id": "evt-root"},
+        {"parent_event_id": parent.event_id},
     )
 
 
@@ -80,7 +85,7 @@ def test_chain_step_refused_by_ethics_never_invokes_specialist(
         ethics_kernel=kernel,
     )
 
-    result = executor.execute(_plan({"target_tenant_id": "tenant-b"}), _request())
+    result = executor.execute(_plan({"target_tenant_id": "tenant-b"}), _request(ledger))
 
     refused = ledger.find_by_type(EventType.CHAIN_STEP_REFUSED_BY_ETHICS)
     aborted = ledger.find_by_type(EventType.CHAIN_ABORTED)
@@ -103,7 +108,7 @@ def test_chain_step_awaiting_review_never_invokes_specialist(
         ethics_kernel=kernel,
     )
 
-    result = executor.execute(_plan({"destructive": True}), _request())
+    result = executor.execute(_plan({"destructive": True}), _request(ledger))
 
     awaiting = ledger.find_by_type(EventType.CHAIN_STEP_AWAITING_REVIEW)
     assert result.aborted
@@ -124,7 +129,7 @@ def test_chain_step_allowed_by_ethics_invokes_specialist(
         ethics_kernel=kernel,
     )
 
-    result = executor.execute(_plan(), _request())
+    result = executor.execute(_plan(), _request(ledger))
 
     assert not result.aborted
     assert specialist.calls == 1
@@ -152,7 +157,7 @@ def test_terraform_apply_is_refused_before_specialist_even_with_approval(
                 "governance_approval_id": "GOV-123",
             }
         ),
-        _request(),
+        _request(ledger),
     )
 
     refused = ledger.find_by_type(EventType.CHAIN_STEP_REFUSED_BY_ETHICS)

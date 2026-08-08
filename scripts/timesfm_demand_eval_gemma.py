@@ -10,7 +10,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from vecl.provenance.events import EventType
+from vecl._paths import environment_directory
+from vecl.provenance.events import EventType, ProvenanceEvent
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb._llm_inference import DEFAULT_ROUTING_MODEL_ID, gemma_route_once
 from vecl.qb.orchestrator import QBOrchestrator
@@ -120,8 +121,8 @@ def run_demand_eval(
     model_id: str,
     artifact_root: Path | None = None,
 ) -> dict[str, Any]:
-    artifact_root = artifact_root or Path(
-        os.environ.get("VECL_ARTIFACT_STORE", "/tmp/vecl-timesfm-demand-artifacts")
+    artifact_root = artifact_root or environment_directory(
+        "VECL_ARTIFACT_STORE", prefix="vecl-timesfm-demand-artifacts-"
     )
     store = ContentAddressedStore(artifact_root)
     ledger = ProvenanceLedger()
@@ -154,13 +155,21 @@ def run_demand_eval(
     rows: list[dict[str, Any]] = []
 
     for index, entry in enumerate(entries, start=1):
+        route_request_event = ledger.append(
+            ProvenanceEvent(
+                EventType.EVIDENCE_INGESTED,
+                "timesfm-demand-eval",
+                "timesfm-demand-eval",
+                {"entry_id": entry["id"], "purpose": "preflight-routing"},
+            )
+        )
         route_request = SpecialistRequest(
             f"timesfm-route-{index}",
             "timesfm-demand-eval",
             entry["task_type"],
             entry["input_payload"],
             {},
-            {"parent_event_id": f"timesfm-demand-eval-{index}"},
+            {"parent_event_id": route_request_event.event_id},
         )
         routed = router.route(route_request, max_specialists=1)
         routed_ids = [specialist.specialist_id for specialist in routed]

@@ -42,8 +42,18 @@ class SparseMemoryInputs:
         lengths = {name: len(array) for name, array in arrays.items()}
         if len(set(lengths.values())) != 1:
             raise ValueError(f"all numeric arrays must have the same length: {lengths}")
+        if not np.all(
+            np.isfinite(
+                np.asarray(
+                    [self.learning_rate, self.min_authority, self.min_score], dtype=np.float64
+                )
+            )
+        ):
+            raise ValueError("learning_rate and thresholds must be finite")
         if self.learning_rate < 0:
             raise ValueError("learning_rate must be >= 0")
+        if isinstance(self.max_slots, bool) or not isinstance(self.max_slots, int):
+            raise ValueError("max_slots must be an integer")
         if self.max_slots < 0:
             raise ValueError("max_slots must be >= 0")
         if self.min_authority < 0:
@@ -52,6 +62,8 @@ class SparseMemoryInputs:
             raise ValueError("min_score must be >= 0")
         slot_count = next(iter(lengths.values()), 0)
         quarantined = set(self.quarantined_slots)
+        if any(isinstance(slot, bool) or not isinstance(slot, int) for slot in quarantined):
+            raise ValueError("quarantined slots must be integers")
         invalid = sorted(slot for slot in quarantined if slot < 0 or slot >= slot_count)
         if invalid:
             raise ValueError(f"quarantined slots out of range: {invalid}")

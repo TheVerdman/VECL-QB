@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+import json
+import sqlite3
+
 import numpy as np
 import pytest
 
@@ -44,6 +47,31 @@ def test_sqlite_ledger_reopens_with_chain_hash_continuity(tmp_path) -> None:  # 
     )
     assert third.chain_hash != second.chain_hash
     assert reopened.query_by_tenant("tenant-a")[-1].event_id == third.event_id
+
+
+def test_sqlite_ledger_rejects_tampered_event_history_on_reopen(tmp_path) -> None:  # type: ignore[no-untyped-def]
+    ledger_path = tmp_path / ".vecl" / "provenance.sqlite3"
+    with SqliteProvenanceLedger(ledger_path) as ledger:
+        event = ledger.append(
+            ProvenanceEvent(EventType.EVIDENCE_INGESTED, "tenant-a", "tester", {"n": 1})
+        )
+
+    connection = sqlite3.connect(ledger_path)
+    row = connection.execute(
+        "SELECT event_json FROM events WHERE event_id = ?", (event.event_id,)
+    ).fetchone()
+    assert row is not None
+    payload = json.loads(str(row[0]))
+    payload["payload"]["n"] = 2
+    connection.execute(
+        "UPDATE events SET event_json = ? WHERE event_id = ?",
+        (json.dumps(payload, sort_keys=True), event.event_id),
+    )
+    connection.commit()
+    connection.close()
+
+    with pytest.raises(ValueError, match="payload hash"):
+        SqliteProvenanceLedger(ledger_path)
 
 
 def test_sqlite_ledger_validates_against_persisted_prepared_event(tmp_path) -> None:  # type: ignore[no-untyped-def]

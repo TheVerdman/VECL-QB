@@ -153,7 +153,7 @@ def test_backend_runs_sympy_and_exposes_trace(tmp_path: Path) -> None:
     assert "LLMToolCallProposed" in event_types
     assert "ChainStarted" in event_types
     assert "ArtifactProduced" in event_types
-    assert "ReplayBatchPrepared" in event_types
+    assert "FinalResponseRecorded" in event_types
     assert run["cumulative_cost_usd"] == 0.00001
 
 

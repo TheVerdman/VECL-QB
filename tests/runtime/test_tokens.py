@@ -1,7 +1,9 @@
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta
+from math import nan
 
 import pytest
 
+from vecl._compat import UTC
 from vecl.runtime.tokens import (
     LearningEventToken,
     create_learning_event_token,
@@ -33,6 +35,13 @@ def test_expired_token_rejected() -> None:
         validate_learning_event_token(token, datetime.now(UTC), "tenant-a")
 
 
+def test_token_is_rejected_at_exact_expiration() -> None:
+    token = _token()
+    now = token.expires_at
+    with pytest.raises(ValueError, match="expired"):
+        validate_learning_event_token(token, now, "tenant-a")
+
+
 def test_tenant_mismatch_rejected() -> None:
     with pytest.raises(ValueError, match="tenant"):
         validate_learning_event_token(_token(), datetime.now(UTC), "tenant-b")
@@ -48,3 +57,15 @@ def test_invalid_thresholds_rejected() -> None:
         validate_learning_event_token(_token(min_authority=-0.1), datetime.now(UTC), "tenant-a")
     with pytest.raises(ValueError, match="max_slots"):
         validate_learning_event_token(_token(max_slots=-1), datetime.now(UTC), "tenant-a")
+    with pytest.raises(ValueError, match="finite"):
+        validate_learning_event_token(_token(min_score=nan), datetime.now(UTC), "tenant-a")
+
+
+def test_malformed_token_timestamps_fail_closed() -> None:
+    now = datetime.now(UTC)
+    with pytest.raises(ValueError, match="timezone-aware"):
+        validate_learning_event_token(_token(created_at=now.replace(tzinfo=None)), now, "tenant-a")
+    with pytest.raises(ValueError, match="future"):
+        validate_learning_event_token(
+            _token(created_at=now + timedelta(seconds=1)), now, "tenant-a"
+        )

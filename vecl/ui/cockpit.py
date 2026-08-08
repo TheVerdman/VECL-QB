@@ -16,6 +16,7 @@ from uuid import uuid4
 
 from vecl._compat import UTC
 from vecl._env import load_dotenv_if_present
+from vecl._paths import environment_directory
 from vecl.ethics import EthicsKernel, default_ethics_rules
 from vecl.provenance.events import EventType, ProvenanceEvent, stable_hash
 from vecl.provenance.ledger import ProvenanceLedger
@@ -286,7 +287,9 @@ class CockpitBackend:
         driver_factory: DriverFactory | None = None,
         specialist_specs: Sequence[SpecialistSpec] | None = None,
     ) -> None:
-        root = artifact_root or Path(os.environ.get("TMPDIR", "/tmp")) / "vecl-ui-artifacts"
+        root = artifact_root or environment_directory(
+            "VECL_UI_ARTIFACT_ROOT", prefix="vecl-ui-artifacts-"
+        )
         self.artifact_store = ContentAddressedStore(root)
         self._driver_factory = driver_factory or _default_driver_factory
         self._specialist_specs = {
@@ -1004,7 +1007,7 @@ class CockpitBackend:
     ) -> None:
         event = ledger.append(
             ProvenanceEvent(
-                EventType.REPLAY_BATCH_PREPARED,
+                EventType.FINAL_RESPONSE_RECORDED,
                 request.tenant_id,
                 "vecl-ui-cockpit",
                 {
@@ -1944,7 +1947,7 @@ def _extract_assignment(prompt: str, key: str) -> str | None:
 def _extract_expression(prompt: str) -> str | None:
     fenced = re.findall(r"`([^`]+)`", prompt)
     if fenced:
-        return fenced[0].strip()
+        return str(fenced[0]).strip()
     match = re.search(r"(?:expression|expr)\s*[:=]\s*(.+)$", prompt, flags=re.IGNORECASE)
     if match:
         return match.group(1).strip()
@@ -1959,7 +1962,7 @@ def _extract_sequence(prompt: str) -> str | None:
     candidates = re.findall(r"\b[ACGTUNacgtun]{12,}\b", prompt)
     if not candidates:
         return None
-    return max(candidates, key=len).upper().replace("U", "T")
+    return str(max(candidates, key=len)).upper().replace("U", "T")
 
 
 def _extract_horizon(prompt: str) -> int | None:
