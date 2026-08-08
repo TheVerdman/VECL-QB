@@ -8,7 +8,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from vecl.evaluation.evaluators import SummaryEvaluator
+from vecl._paths import environment_directory
+from vecl.evaluation.evaluators import DemoSummaryEvaluator
 from vecl.evaluation.release import approve_release_report, save_release_report
 from vecl.evaluation.types import (
     EvaluationResult,
@@ -16,6 +17,7 @@ from vecl.evaluation.types import (
     ReleaseEvaluationReport,
     thresholds_from_payloads,
 )
+from vecl.provenance.events import stable_hash
 from vecl.provenance.ledger import SqliteProvenanceLedger
 from vecl.qb.model_driver import ModelDriver, resolve_model_driver
 from vecl.specialists.artifacts import ContentAddressedStore
@@ -75,8 +77,8 @@ def main(
 ) -> int:
     del argv
     base = base_dir or Path(__file__).resolve().parent
-    artifact_root = artifact_root or Path(
-        os.environ.get("VECL_RELEASE_EVAL_ARTIFACT_ROOT", "/tmp/vecl-release-eval-artifacts")
+    artifact_root = artifact_root or environment_directory(
+        "VECL_RELEASE_EVAL_ARTIFACT_ROOT", prefix="vecl-release-eval-artifacts-"
     )
     artifact_root.mkdir(parents=True, exist_ok=True)
 
@@ -94,7 +96,12 @@ def main(
     )
     save_release_report(report, report_path)
     print(json.dumps(report.to_payload(), sort_keys=True), flush=True)
-    if not report.passed:
+    if not report.approval_eligible:
+        print(
+            "RELEASE_APPROVAL_BLOCKED "
+            + json.dumps({"reasons": list(report.approval_reasons())}, sort_keys=True),
+            flush=True,
+        )
         return 1
     with SqliteProvenanceLedger(ledger_path) as ledger:
         event = approve_release_report(report, ledger, "vertex-release-eval")
@@ -158,14 +165,19 @@ def run_aggregate_release_eval(
         else:
             summary = {"execution_mode": "in_process_shared_model_driver", **summary}
             print(SUMMARY_PREFIXES[name] + json.dumps(summary, sort_keys=True), flush=True)
-            result = SummaryEvaluator(
+            result = DemoSummaryEvaluator(
                 name=spec.name,
                 category=spec.category,
                 summary=summary,
                 thresholds=spec.thresholds,
-            ).evaluate()
+            ).evaluate(candidate_id)
         results.append(result)
-    return ReleaseEvaluationReport(candidate_id=candidate_id, results=tuple(results))
+    manifest_payload = json.loads(manifest_path.read_text())
+    return ReleaseEvaluationReport(
+        candidate_id=candidate_id,
+        results=tuple(results),
+        manifest_hash=stable_hash(manifest_payload),
+    )
 
 
 def load_aggregate_specs(manifest_path: Path) -> dict[str, AggregateEvalSpec]:
@@ -194,14 +206,26 @@ def build_report_from_summaries(
     for name in EVAL_ORDER:
         spec = specs[name]
         results.append(
-            SummaryEvaluator(
+            DemoSummaryEvaluator(
                 name=spec.name,
                 category=spec.category,
                 summary=dict(summaries[name]),
                 thresholds=spec.thresholds,
-            ).evaluate()
+            ).evaluate(candidate_id)
         )
-    return ReleaseEvaluationReport(candidate_id=candidate_id, results=tuple(results))
+    return ReleaseEvaluationReport(
+        candidate_id=candidate_id,
+        results=tuple(results),
+        manifest_hash=stable_hash(
+            {
+                name: {
+                    "category": spec.category,
+                    "thresholds": [threshold.to_payload() for threshold in spec.thresholds],
+                }
+                for name, spec in sorted(specs.items())
+            }
+        ),
+    )
 
 
 def _run_model_driver_eval(base_dir: Path, driver: ModelDriver) -> dict[str, Any]:

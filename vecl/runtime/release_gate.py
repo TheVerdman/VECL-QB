@@ -16,6 +16,8 @@ class ReleaseGateEvaluation:
     rollback_test_pass: bool
     verification_calibration_not_worse: bool
     no_tenant_isolation_failure: bool
+    evidence_valid: bool = False
+    report_hash: str | None = None
     drift_within_bound: bool = True
     drift_value: float | None = None
     drift_threshold: float | None = None
@@ -33,6 +35,7 @@ class ReleaseGateEvaluation:
                 self.verification_calibration_not_worse,
                 self.no_tenant_isolation_failure,
                 self.drift_within_bound,
+                self.evidence_valid,
             ]
         )
 
@@ -61,6 +64,10 @@ class ReleaseGate:
                 "verification_calibration_not_worse", False
             ),
             no_tenant_isolation_failure=checks.get("no_tenant_isolation_failure", False),
+            evidence_valid=checks.get("evidence_valid", False),
+            report_hash=(
+                str(checks["report_hash"]) if checks.get("report_hash") is not None else None
+            ),
             drift_within_bound=checks.get("drift_within_bound", True),
             drift_value=_optional_float(checks.get("drift_value")),
             drift_threshold=_optional_float(checks.get("drift_threshold")),
@@ -77,7 +84,16 @@ class ReleaseGate:
 
     def approve(self, evaluation: ReleaseGateEvaluation) -> ProvenanceEvent:
         if not evaluation.passed:
-            raise ValueError("candidate checkpoint cannot be promoted without passing gate")
+            raise ValueError(
+                "candidate checkpoint cannot be promoted without passing gate and valid evidence"
+            )
+        if evaluation.report is None or not evaluation.report_hash:
+            raise ValueError("candidate checkpoint approval requires a hashed release report")
+        _validate_release_report_payload(
+            evaluation.report,
+            evaluation.report_hash,
+            expected_candidate_id=evaluation.checkpoint_id,
+        )
         return self.ledger.append(
             ProvenanceEvent(
                 event_type=EventType.RELEASE_APPROVED,
@@ -107,3 +123,22 @@ class ReleaseGate:
 
 def _optional_float(value: Any) -> float | None:
     return None if value is None else float(value)
+
+
+def _validate_release_report_payload(
+    report: dict[str, Any], report_hash: str, *, expected_candidate_id: str
+) -> None:
+    from vecl.evaluation.types import ReleaseEvaluationReport
+
+    try:
+        parsed = ReleaseEvaluationReport.from_payload(report)
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ValueError(f"release report is malformed: {exc}") from exc
+    if parsed.report_hash != report_hash:
+        raise ValueError("release report hash does not match gate evidence")
+    if parsed.candidate_id != expected_candidate_id:
+        raise ValueError("release report candidate does not match checkpoint")
+    if not parsed.approval_eligible:
+        raise ValueError(
+            "release report is not approval eligible: " + "; ".join(parsed.approval_reasons())
+        )

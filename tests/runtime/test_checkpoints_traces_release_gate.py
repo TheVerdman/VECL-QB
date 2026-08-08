@@ -164,7 +164,24 @@ def test_release_gate_blocks_failed_adversarial_simulation_and_emits_events() ->
         verification_calibration_not_worse=True,
         no_tenant_isolation_failure=True,
     )
-    assert gate.approve(passed).event_type == EventType.RELEASE_APPROVED
+    assert not passed.passed
+    with pytest.raises(ValueError, match="valid evidence"):
+        gate.approve(passed)
+
+    forged = gate.evaluate_candidate_checkpoint(
+        "c2",
+        invariant_tests_pass=True,
+        regression_tests_pass=True,
+        adversarial_simulation_within_bound=True,
+        rollback_test_pass=True,
+        verification_calibration_not_worse=True,
+        no_tenant_isolation_failure=True,
+        evidence_valid=True,
+        report_hash="a" * 64,
+        report={"report_hash": "a" * 64},
+    )
+    with pytest.raises(ValueError, match="malformed"):
+        gate.approve(forged)
 
 
 def test_release_gate_defaults_drift_pass_and_blocks_exceeded_drift() -> None:
@@ -193,7 +210,7 @@ def test_release_gate_defaults_drift_pass_and_blocks_exceeded_drift() -> None:
         drift_report={"drift_value": 2.0, "drift_threshold": 1.0},
     )
 
-    assert no_drift_report.passed
+    assert not no_drift_report.passed
     assert no_drift_report.drift_within_bound
     assert not exceeded.passed
     assert exceeded.drift_value == 2.0

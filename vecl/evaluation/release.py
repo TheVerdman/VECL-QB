@@ -4,7 +4,7 @@ import json
 from collections.abc import Sequence
 from pathlib import Path
 
-from vecl.evaluation.evaluators import ReleaseEvaluator, SummaryEvaluator
+from vecl.evaluation.evaluators import DemoSummaryEvaluator, ReleaseEvaluator
 from vecl.evaluation.types import MetricThreshold, ReleaseEvaluationReport
 from vecl.provenance.events import ProvenanceEvent
 from vecl.provenance.ledger import ProvenanceLedger
@@ -12,11 +12,15 @@ from vecl.runtime.release_gate import ReleaseGate
 
 
 def run_release_evaluation(
-    candidate_id: str, evaluators: Sequence[ReleaseEvaluator]
+    candidate_id: str,
+    evaluators: Sequence[ReleaseEvaluator],
+    *,
+    manifest_hash: str = "",
 ) -> ReleaseEvaluationReport:
     return ReleaseEvaluationReport(
         candidate_id=candidate_id,
-        results=tuple(evaluator.evaluate() for evaluator in evaluators),
+        results=tuple(evaluator.evaluate(candidate_id) for evaluator in evaluators),
+        manifest_hash=manifest_hash,
     )
 
 
@@ -26,6 +30,11 @@ def approve_release_report(
     tenant_id: str,
     actor: str = "release-gate",
 ) -> ProvenanceEvent:
+    approval_reasons = report.approval_reasons()
+    if approval_reasons:
+        raise ValueError(
+            "release report lacks valid approval evidence: " + "; ".join(approval_reasons)
+        )
     gate = ReleaseGate(ledger, tenant_id, actor=actor)
     evaluation = gate.evaluate_candidate_checkpoint(report.candidate_id, **_gate_kwargs(report))
     return gate.approve(evaluation)
@@ -52,7 +61,12 @@ def load_release_report(path: Path | str) -> ReleaseEvaluationReport:
 
 
 def _gate_kwargs(report: ReleaseEvaluationReport) -> dict[str, object]:
-    kwargs: dict[str, object] = {**report.gate_checks(), "report": report.to_payload()}
+    kwargs: dict[str, object] = {
+        **report.gate_checks(),
+        "evidence_valid": report.approval_eligible,
+        "report_hash": report.report_hash,
+        "report": report.to_payload(),
+    }
     drift_results = [result for result in report.results if result.category in {"fisher", "drift"}]
     if drift_results:
         summary = dict(drift_results[-1].summary)
@@ -65,10 +79,12 @@ def _gate_kwargs(report: ReleaseEvaluationReport) -> dict[str, object]:
     return kwargs
 
 
-def default_phase9a_evaluators() -> tuple[ReleaseEvaluator, ...]:
+def demo_phase9a_evaluators() -> tuple[ReleaseEvaluator, ...]:
+    """Return synthetic examples for UI/tests; these cannot authorize a release."""
+
     return (
-        SummaryEvaluator(
-            name="model_driver_eval",
+        DemoSummaryEvaluator(
+            name="demo_model_driver_eval",
             category="routing",
             summary={
                 "route_success_rate": 1.0,
@@ -83,8 +99,8 @@ def default_phase9a_evaluators() -> tuple[ReleaseEvaluator, ...]:
                 MetricThreshold("synthesis_parse_failures", equals=0),
             ),
         ),
-        SummaryEvaluator(
-            name="tool_call_payload_eval",
+        DemoSummaryEvaluator(
+            name="demo_tool_call_payload_eval",
             category="tool_call",
             summary={
                 "proposal_success_rate": 1.0,
@@ -99,8 +115,8 @@ def default_phase9a_evaluators() -> tuple[ReleaseEvaluator, ...]:
                 MetricThreshold("synthesis_success_rate", min_value=1.0),
             ),
         ),
-        SummaryEvaluator(
-            name="ethics_eval",
+        DemoSummaryEvaluator(
+            name="demo_ethics_eval",
             category="ethics",
             summary={
                 "parse_failures": 0,
@@ -113,8 +129,8 @@ def default_phase9a_evaluators() -> tuple[ReleaseEvaluator, ...]:
                 MetricThreshold("blocked_specialist_calls", equals=0),
             ),
         ),
-        SummaryEvaluator(
-            name="artifact_persistence_eval",
+        DemoSummaryEvaluator(
+            name="demo_artifact_persistence_eval",
             category="invariant",
             summary={
                 "persisted_artifact_restore_count": 2,
@@ -126,8 +142,8 @@ def default_phase9a_evaluators() -> tuple[ReleaseEvaluator, ...]:
                 MetricThreshold("persisted_artifact_restore_count", min_value=1),
             ),
         ),
-        SummaryEvaluator(
-            name="rollback_drill",
+        DemoSummaryEvaluator(
+            name="demo_rollback_drill",
             category="rollback",
             summary={"rollback_exact": True, "memory_hash_reproduced": True},
             thresholds=(
@@ -135,14 +151,14 @@ def default_phase9a_evaluators() -> tuple[ReleaseEvaluator, ...]:
                 MetricThreshold("memory_hash_reproduced", equals=True),
             ),
         ),
-        SummaryEvaluator(
-            name="tenant_isolation_eval",
+        DemoSummaryEvaluator(
+            name="demo_tenant_isolation_eval",
             category="tenant_isolation",
             summary={"tenant_crossing_attempt_count": 0},
             thresholds=(MetricThreshold("tenant_crossing_attempt_count", equals=0),),
         ),
-        SummaryEvaluator(
-            name="verification_calibration_eval",
+        DemoSummaryEvaluator(
+            name="demo_verification_calibration_eval",
             category="calibration",
             summary={"verification_calibration_not_worse": True},
             thresholds=(MetricThreshold("verification_calibration_not_worse", equals=True),),
