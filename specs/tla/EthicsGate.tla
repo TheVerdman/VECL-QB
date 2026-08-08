@@ -1,6 +1,7 @@
 ---- MODULE EthicsGate ----
 EXTENDS Naturals, Sequences
 
-\* Placeholder governance contract module. Governance remains control-plane.
+\* NON-EXECUTABLE PLACEHOLDER for future governance modeling.
+\* This module defines no state machine or invariants and is not checked by TLC.
 
 ====
