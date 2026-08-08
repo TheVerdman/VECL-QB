@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
+
 from vecl.provenance.events import EventType
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb.claim_graph import ClaimGraph
@@ -18,6 +20,23 @@ from vecl.specialists.stockfish import (
 )
 
 STARTING_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+
+
+def _stockfish_available() -> bool:
+    try:
+        resolve_stockfish_binary()
+    except FileNotFoundError:
+        return False
+    return True
+
+
+pytestmark = [
+    pytest.mark.optional,
+    pytest.mark.skipif(
+        not _stockfish_available(),
+        reason="Stockfish 18 is not installed; these are optional real-tool tests",
+    ),
+]
 
 
 def _request(tmp_path: Path) -> tuple[StockfishSpecialist, SpecialistRequest]:

@@ -8,7 +8,7 @@ test:
 	$(PYTHON) -m pytest
 
 test-core:
-	$(PYTHON) -m pytest --ignore=tests/integration --ignore=tests/episodic/test_optional_backends.py
+	$(PYTHON) -m pytest -m "not optional" --ignore=tests/integration --ignore=tests/episodic/test_optional_backends.py
 
 coverage:
 	$(PYTHON) -m coverage run -m pytest

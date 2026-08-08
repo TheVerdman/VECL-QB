@@ -147,7 +147,7 @@ contract.
 ## Repository operations
 
 ```bash
-uv run pytest --ignore=tests/integration --ignore=tests/episodic/test_optional_backends.py
+uv run make test-core PYTHON="uv run python"
 uv run make coverage
 uv run vecl release evaluate CANDIDATE --manifest PATH --output release-report.json
 ```

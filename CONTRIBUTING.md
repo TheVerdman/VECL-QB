@@ -23,8 +23,11 @@ reports branch and line coverage without enforcing an arbitrary percentage.
 Core tests can be run without the locally optional/integration group:
 
 ```bash
-uv run pytest --ignore=tests/integration --ignore=tests/episodic/test_optional_backends.py
+uv run make test-core PYTHON="uv run python"
 ```
+
+Real-executable tests are marked `optional` and skip cleanly when Stockfish or BLAST+ is absent.
+Run `uv run pytest -m optional` on a workstation with those tools to exercise that boundary.
 
 ## Change expectations
 
