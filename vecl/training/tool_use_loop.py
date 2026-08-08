@@ -3,7 +3,7 @@ from __future__ import annotations
 import hashlib
 import json
 import math
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -59,6 +59,9 @@ class SupervisedToolUseExample:
         return payload
 
 
+TrainingPromptBuilder = Callable[[SupervisedToolUseExample], str]
+
+
 @dataclass(frozen=True)
 class ToolUseTrainingConfig:
     learning_rate: float = 1e-4
@@ -70,6 +73,7 @@ class ToolUseTrainingConfig:
     trust_policy_version: str = "trust-v0"
     ewc_lambda: float = 0.0
     ewc_drift_threshold: float | None = None
+    enforce_drift_bound: bool = True
 
     def __post_init__(self) -> None:
         if not np.isfinite(self.ewc_lambda) or self.ewc_lambda < 0:
@@ -119,6 +123,15 @@ class ToolUseTrainingReport:
     selection_diagnostics_hash: str | None = None
     run_metadata: dict[str, Any] = field(default_factory=dict)
     probe_metrics: dict[str, Any] = field(default_factory=dict)
+    candidate_id: str | None = None
+    candidate_decision: str = "accepted"
+    candidate_rejection_reason: str | None = None
+    candidate_snapshot_path: str | None = None
+    candidate_snapshot_hash: str | None = None
+    start_snapshot_path: str | None = None
+    start_snapshot_hash: str | None = None
+    restored_snapshot_hash: str | None = None
+    drift_bound_enforced: bool = False
 
     def to_payload(self) -> dict[str, Any]:
         return asdict(self)
@@ -139,7 +152,9 @@ class ToolUseTrainer:
         baseline_snapshot_path: str | Path | None = None,
         expected_baseline_snapshot_hash: str | None = None,
         ewc_approved_snapshot_path: str | Path | None = None,
+        expected_ewc_approved_snapshot_hash: str | None = None,
         run_metadata: Mapping[str, Any] | None = None,
+        training_prompt_builder: TrainingPromptBuilder | None = None,
     ) -> None:
         self.model = model
         self.processor = processor
@@ -156,7 +171,9 @@ class ToolUseTrainer:
         self.ewc_approved_snapshot_path = (
             Path(ewc_approved_snapshot_path) if ewc_approved_snapshot_path is not None else None
         )
+        self.expected_ewc_approved_snapshot_hash = expected_ewc_approved_snapshot_hash
         self.run_metadata = dict(run_metadata or {})
+        self.training_prompt_builder = training_prompt_builder
 
     def run_cycle(
         self,
@@ -191,6 +208,26 @@ class ToolUseTrainer:
         ewc_snapshot_hash = snapshot_file_hash(ewc_snapshot_path) if ewc_snapshot_path else None
         self.substrate.snapshot(before_path)
         before_hash = snapshot_file_hash(before_path)
+        candidate_id = (
+            f"candidate-{stable_hash({'batch_id': batch_id, 'start_hash': before_hash})[:16]}"
+        )
+        candidate_prepared = self._append_candidate_event(
+            EventType.LEARNING_CANDIDATE_PREPARED,
+            tenant_id=tenant_id,
+            candidate_id=candidate_id,
+            parent_event_ids=[batch_event.event_id],
+            payload={
+                "batch_id": batch_id,
+                "dataset_hash": data_hash,
+                "start_snapshot_hash": before_hash,
+                "baseline_id": self.baseline_id,
+                "baseline_snapshot_hash": baseline_hash,
+                "ewc_approved_snapshot_hash": ewc_snapshot_hash,
+                "ewc_drift_threshold": self.config.ewc_drift_threshold,
+                "drift_bound_enforced": self.config.enforce_drift_bound,
+                **self.run_metadata,
+            },
+        )
         token = None
         mutated = False
         try:
@@ -238,6 +275,122 @@ class ToolUseTrainer:
             self.substrate.snapshot(after_path)
             after_hash = snapshot_file_hash(after_path)
             drift_report = self._ewc_drift_report(after_path)
+            candidate_evaluated = self._append_candidate_event(
+                EventType.LEARNING_CANDIDATE_EVALUATED,
+                tenant_id=tenant_id,
+                candidate_id=candidate_id,
+                parent_event_ids=[candidate_prepared.event_id],
+                payload={
+                    "batch_id": batch_id,
+                    "dataset_hash": data_hash,
+                    "start_snapshot_hash": before_hash,
+                    "candidate_snapshot_hash": after_hash,
+                    "selected_slots": list(result.selected_slots),
+                    "ewc_drift_report": drift_report,
+                    "drift_bound_enforced": self.config.enforce_drift_bound,
+                    **self.run_metadata,
+                },
+            )
+            drift_exceeded = (
+                drift_report is not None
+                and self.config.enforce_drift_bound
+                and drift_report.get("drift_within_bound") is False
+            )
+            if drift_exceeded:
+                reason = "Fisher-weighted drift exceeded configured threshold"
+                self.substrate.restore(before_path)
+                abort_event = self.monitor.abort_learning_event(
+                    token,
+                    reason,
+                    payload={
+                        "dataset_hash": data_hash,
+                        "before_snapshot_hash": before_hash,
+                        "candidate_snapshot_hash": after_hash,
+                        "baseline_id": self.baseline_id,
+                        "baseline_snapshot_hash": baseline_hash,
+                        "ewc_approved_snapshot_hash": ewc_snapshot_hash,
+                        "ewc_drift_report": drift_report,
+                        "candidate_id": candidate_id,
+                        **self.run_metadata,
+                    },
+                )
+                rejected_event = self._append_candidate_event(
+                    EventType.LEARNING_CANDIDATE_REJECTED,
+                    tenant_id=tenant_id,
+                    candidate_id=candidate_id,
+                    parent_event_ids=[candidate_evaluated.event_id, abort_event.event_id],
+                    payload={
+                        "batch_id": batch_id,
+                        "dataset_hash": data_hash,
+                        "reason": reason,
+                        "start_snapshot_hash": before_hash,
+                        "candidate_snapshot_hash": after_hash,
+                        "ewc_drift_report": drift_report,
+                        "candidate_quarantined": True,
+                        **self.run_metadata,
+                    },
+                )
+                self._append_candidate_event(
+                    EventType.LEARNING_CANDIDATE_RESTORED,
+                    tenant_id=tenant_id,
+                    candidate_id=candidate_id,
+                    parent_event_ids=[rejected_event.event_id],
+                    payload={
+                        "batch_id": batch_id,
+                        "dataset_hash": data_hash,
+                        "restored_snapshot_hash": before_hash,
+                        "restored_from_candidate_hash": after_hash,
+                        **self.run_metadata,
+                    },
+                )
+                probe_after = self._losses_for_probe_sets(named_probe_sets)
+                return ToolUseTrainingReport(
+                    batch_id=batch_id,
+                    dataset_hash=data_hash,
+                    loss_before_update=float(task_loss),
+                    selected_slots=list(result.selected_slots),
+                    eligible_slots=list(result.eligible_slots),
+                    tensor_delta_records=[asdict(record) for record in tensor_records],
+                    before_snapshot_path=str(before_path),
+                    before_snapshot_hash=before_hash,
+                    after_snapshot_path=str(after_path),
+                    after_snapshot_hash=after_hash,
+                    learning_event_id=token.event_id,
+                    committed=False,
+                    task_loss_before_update=float(task_loss),
+                    total_loss_before_update=float(total_loss),
+                    ewc_penalty_value=float(ewc_penalty),
+                    ewc_approved_snapshot_path=str(ewc_snapshot_path)
+                    if ewc_snapshot_path
+                    else None,
+                    ewc_approved_snapshot_hash=ewc_snapshot_hash,
+                    ewc_drift_report=drift_report,
+                    baseline_id=self.baseline_id,
+                    baseline_snapshot_path=(
+                        str(self.baseline_snapshot_path) if self.baseline_snapshot_path else None
+                    ),
+                    baseline_snapshot_hash=baseline_hash,
+                    baseline_restored=self.baseline_snapshot_path is not None,
+                    gradient_accumulation_steps=self.config.gradient_accumulation_steps,
+                    selection_diagnostics_path=str(diagnostics_path),
+                    selection_diagnostics_hash=diagnostics_hash,
+                    run_metadata=dict(self.run_metadata),
+                    probe_metrics=_report_probe_metrics(
+                        probe_before,
+                        probe_after,
+                        examples_by_name=named_probe_sets,
+                        return_named=probe_sets is not None,
+                    ),
+                    candidate_id=candidate_id,
+                    candidate_decision="rejected_drift_exceeded",
+                    candidate_rejection_reason=reason,
+                    candidate_snapshot_path=str(after_path),
+                    candidate_snapshot_hash=after_hash,
+                    start_snapshot_path=str(before_path),
+                    start_snapshot_hash=before_hash,
+                    restored_snapshot_hash=before_hash,
+                    drift_bound_enforced=self.config.enforce_drift_bound,
+                )
             extra_payload = {
                 "substrate": "lora",
                 "tensor_delta_records": [asdict(record) for record in tensor_records],
@@ -259,9 +412,31 @@ class ToolUseTrainer:
                 "baseline_restored": self.baseline_snapshot_path is not None,
                 "gradient_accumulation_steps": self.config.gradient_accumulation_steps,
                 "selection_diagnostics_hash": diagnostics_hash,
+                "candidate_id": candidate_id,
+                "candidate_decision": "accepted",
+                "candidate_snapshot_hash": after_hash,
+                "start_snapshot_hash": before_hash,
                 **self.run_metadata,
             }
-            self.monitor.commit_learning_event(token, extra_payload=extra_payload)
+            applied_event, committed_event = self.monitor.commit_learning_event(
+                token, extra_payload=extra_payload
+            )
+            self._append_candidate_event(
+                EventType.LEARNING_CANDIDATE_ACCEPTED,
+                tenant_id=tenant_id,
+                candidate_id=candidate_id,
+                parent_event_ids=[committed_event.event_id],
+                payload={
+                    "batch_id": batch_id,
+                    "dataset_hash": data_hash,
+                    "sparse_update_event_id": applied_event.event_id,
+                    "learning_event_id": token.event_id,
+                    "start_snapshot_hash": before_hash,
+                    "candidate_snapshot_hash": after_hash,
+                    "ewc_drift_report": drift_report,
+                    **self.run_metadata,
+                },
+            )
             probe_after = self._losses_for_probe_sets(named_probe_sets)
             return ToolUseTrainingReport(
                 batch_id=batch_id,
@@ -298,6 +473,13 @@ class ToolUseTrainer:
                     examples_by_name=named_probe_sets,
                     return_named=probe_sets is not None,
                 ),
+                candidate_id=candidate_id,
+                candidate_decision="accepted",
+                candidate_snapshot_path=str(after_path),
+                candidate_snapshot_hash=after_hash,
+                start_snapshot_path=str(before_path),
+                start_snapshot_hash=before_hash,
+                drift_bound_enforced=self.config.enforce_drift_bound,
             )
         except Exception as exc:
             if mutated:
@@ -312,9 +494,27 @@ class ToolUseTrainer:
                         "baseline_id": self.baseline_id,
                         "baseline_snapshot_hash": baseline_hash,
                         "ewc_approved_snapshot_hash": ewc_snapshot_hash,
+                        "candidate_id": candidate_id,
                         **self.run_metadata,
                     },
                 )
+            self._append_candidate_event(
+                EventType.LEARNING_CANDIDATE_REJECTED,
+                tenant_id=tenant_id,
+                candidate_id=candidate_id,
+                parent_event_ids=[candidate_prepared.event_id],
+                payload={
+                    "batch_id": batch_id,
+                    "dataset_hash": data_hash,
+                    "reason": str(exc),
+                    "decision": "aborted_error",
+                    "start_snapshot_hash": before_hash,
+                    "baseline_id": self.baseline_id,
+                    "baseline_snapshot_hash": baseline_hash,
+                    "ewc_approved_snapshot_hash": ewc_snapshot_hash,
+                    **self.run_metadata,
+                },
+            )
             raise
 
     def _restore_baseline_if_configured(self) -> str | None:
@@ -339,7 +539,29 @@ class ToolUseTrainer:
             raise ValueError("ewc_lambda > 0 requires an approved LoRA snapshot")
         if snapshot_path is not None and not snapshot_path.exists():
             raise ValueError(f"EWC approved snapshot not found: {snapshot_path}")
+        if snapshot_path is not None and self.expected_ewc_approved_snapshot_hash:
+            if snapshot_file_hash(snapshot_path) != self.expected_ewc_approved_snapshot_hash:
+                raise ValueError("EWC approved snapshot hash does not match expected hash")
         return snapshot_path
+
+    def _append_candidate_event(
+        self,
+        event_type: EventType,
+        *,
+        tenant_id: str,
+        candidate_id: str,
+        parent_event_ids: list[str],
+        payload: dict[str, Any],
+    ) -> ProvenanceEvent:
+        return self.monitor.ledger.append(
+            ProvenanceEvent(
+                event_type=event_type,
+                tenant_id=tenant_id,
+                actor=self.actor,
+                parent_event_ids=parent_event_ids,
+                payload={"candidate_id": candidate_id, **payload},
+            )
+        )
 
     def _append_batch_event(
         self, batch_id: str, data_hash: str, examples: list[SupervisedToolUseExample]
@@ -425,7 +647,7 @@ class ToolUseTrainer:
                 loss = _supervised_loss(
                     model=self.model,
                     processor=self.processor,
-                    prompt=example.prompt,
+                    prompt=self._training_prompt(example),
                     target=example.target_text,
                     torch=torch,
                 )
@@ -465,12 +687,20 @@ class ToolUseTrainer:
                 loss = _supervised_loss(
                     model=self.model,
                     processor=self.processor,
-                    prompt=example.prompt,
+                    prompt=self._training_prompt(example),
                     target=example.target_text,
                     torch=torch,
                 )
                 losses.append(float(loss.detach().cpu().item()))
         return losses
+
+    def _training_prompt(self, example: SupervisedToolUseExample) -> str:
+        if self.training_prompt_builder is None:
+            return example.prompt
+        prompt = self.training_prompt_builder(example)
+        if not prompt:
+            raise ValueError("training_prompt_builder returned an empty prompt")
+        return prompt
 
     def _losses_for_probe_sets(
         self, probe_sets: Mapping[str, list[SupervisedToolUseExample]]
@@ -591,6 +821,28 @@ def _supervised_loss(*, model: Any, processor: Any, prompt: str, target: str, to
         labels=labels.to(device),
     )
     return output.loss
+
+
+def supervised_loss_for_example(
+    *,
+    model: Any,
+    processor: Any,
+    example: SupervisedToolUseExample,
+    torch: Any,
+    training_prompt_builder: TrainingPromptBuilder | None = None,
+) -> Any:
+    prompt = (
+        training_prompt_builder(example) if training_prompt_builder is not None else example.prompt
+    )
+    if not prompt:
+        raise ValueError("training prompt must be non-empty")
+    return _supervised_loss(
+        model=model,
+        processor=processor,
+        prompt=prompt,
+        target=example.target_text,
+        torch=torch,
+    )
 
 
 def _prompt_inputs(processor: Any, prompt: str, torch: Any) -> dict[str, Any]:
