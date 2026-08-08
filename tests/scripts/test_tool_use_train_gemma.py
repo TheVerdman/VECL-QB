@@ -6,14 +6,24 @@ from pathlib import Path
 from scripts.tool_use_train_gemma import (
     _any_probe_improved,
     _coverage_report,
+    _diagnostic_loss_summary,
     _domain_filter,
     _expected_domains,
     _interference_report,
     _load_examples,
+    _overfit_examples,
+    _score_tool_call_generation,
+    _sparse_cycle_summary,
     _stratified_sample,
     _summary_passed,
+    _tool_call_generation_delta,
+    _tool_call_generation_metrics,
+    _tool_call_generation_prompt,
+    _tool_call_probe_cards,
     _training_examples,
+    _training_prompt_builder,
 )
+from vecl.qb.tool_call import ToolCallValidationConfig
 from vecl.training.tool_use_loop import SupervisedToolUseExample
 
 
@@ -41,6 +51,9 @@ def test_tool_use_training_summary_predicate() -> None:
         "snapshots_uploaded": False,
         "interference_report": {"passed": True},
         "coverage_report": {"passed": True},
+        "candidate_decision": "accepted",
+        "expect_rejection": False,
+        "inline_drift_required": False,
     }
     assert _summary_passed(summary)
     assert not _summary_passed({**summary, "selected_slot_count": 0})
@@ -77,6 +90,17 @@ def test_tool_use_training_summary_predicate() -> None:
     )
     assert not _summary_passed({**summary, "ewc_lambda": 0.1})
     assert not _summary_passed(
+        {**summary, "inline_drift_required": True, "ewc_drift_within_bound": None}
+    )
+    assert _summary_passed(
+        {
+            **summary,
+            "inline_drift_required": True,
+            "ewc_approved_snapshot_hash": "hash",
+            "ewc_drift_within_bound": True,
+        }
+    )
+    assert not _summary_passed(
         {
             **summary,
             "ewc_lambda": 0.1,
@@ -90,6 +114,33 @@ def test_tool_use_training_summary_predicate() -> None:
             "ewc_lambda": 0.1,
             "ewc_approved_snapshot_hash": "hash",
             "ewc_drift_within_bound": True,
+        }
+    )
+    assert _summary_passed(
+        {
+            **summary,
+            "expect_rejection": True,
+            "learning_event_committed": False,
+            "probe_any_improved": False,
+            "ewc_lambda": 0.1,
+            "ewc_approved_snapshot_hash": "hash",
+            "ewc_drift_within_bound": False,
+            "candidate_decision": "rejected_drift_exceeded",
+            "start_snapshot_hash": "start",
+            "restored_snapshot_hash": "start",
+        }
+    )
+    assert not _summary_passed(
+        {
+            **summary,
+            "expect_rejection": True,
+            "learning_event_committed": False,
+            "ewc_lambda": 0.1,
+            "ewc_approved_snapshot_hash": "hash",
+            "ewc_drift_within_bound": False,
+            "candidate_decision": "accepted",
+            "start_snapshot_hash": "start",
+            "restored_snapshot_hash": "start",
         }
     )
 
@@ -219,6 +270,173 @@ def test_tool_use_training_source_records_sample_seed(monkeypatch, tmp_path: Pat
     assert len(train) == 2
     assert set(probes) == {"smoke", "heldout", "hard_heldout"}
     assert source["sample_seed"] == 99
+
+
+def test_tool_call_generation_scoring_and_metrics() -> None:
+    expected = (
+        '{"specialist_id":"sympy","task_type":"symbolic_math",'
+        '"input_payload":{"operation":"simplify","expression":"(x + 1)^2"},'
+        '"confidence":0.9,"reasoning":"math"}'
+    )
+    exact = expected
+    wrong_payload = (
+        '{"specialist_id":"sympy","task_type":"symbolic_math",'
+        '"input_payload":{"operation":"factor","expression":"(x + 1)^2"},'
+        '"confidence":0.9,"reasoning":"math"}'
+    )
+    cards = _tool_call_probe_cards()
+    config = ToolCallValidationConfig(
+        tenant_id="test",
+        request_id="test",
+        terraform_config_dir="/tmp/terraform-fixture",
+    )
+
+    exact_row = _score_tool_call_generation(
+        generated_text=exact,
+        expected_text=expected,
+        cards=cards,
+        config=config,
+    )
+    wrong_row = _score_tool_call_generation(
+        generated_text=wrong_payload,
+        expected_text=expected,
+        cards=cards,
+        config=config,
+    )
+    parse_row = _score_tool_call_generation(
+        generated_text="not json",
+        expected_text=expected,
+        cards=cards,
+        config=config,
+    )
+
+    assert exact_row["all_correct"] is True
+    assert wrong_row["validation_ok"] is True
+    assert wrong_row["payload_match"] is False
+    assert parse_row["parse_ok"] is False
+    metrics = _tool_call_generation_metrics([exact_row, wrong_row, parse_row])
+    assert metrics["sample_count"] == 3
+    assert metrics["parse_success"] == 2
+    assert metrics["all_correct"] == 1
+    delta = _tool_call_generation_delta([wrong_row], [exact_row])
+    assert delta["improved_count"] == 1
+    assert delta["exact_tool_call_accuracy_delta"] == 1.0
+
+
+def test_tool_call_generation_prompt_uses_author_contract() -> None:
+    example = SupervisedToolUseExample(
+        example_id="example-sympy",
+        tenant_id="tenant",
+        source_id="source",
+        authority=0.9,
+        prompt="Simplify (x + 1)^2.",
+        target_text=(
+            '{"specialist_id":"sympy","task_type":"symbolic_math",'
+            '"input_payload":{"operation":"simplify","expression":"(x + 1)^2"},'
+            '"confidence":0.9,"reasoning":"math"}'
+        ),
+        task_kind="tool_call_json",
+        metadata={"corpus_domain": "sympy", "corpus_category": "sympy_tool_call"},
+    )
+
+    prompt = _tool_call_generation_prompt(example, list(_tool_call_probe_cards().values()))
+
+    assert "You are VECL-QB's tool-call author" in prompt
+    assert "Specialist input payload contracts" in prompt
+    assert "task_type_hint: symbolic_math" in prompt
+    assert "Simplify (x + 1)^2." in prompt
+
+
+def test_training_prompt_builder_wraps_tool_calls_only(monkeypatch) -> None:
+    tool_call = SupervisedToolUseExample(
+        example_id="example-sympy",
+        tenant_id="tenant",
+        source_id="source",
+        authority=0.9,
+        prompt="Simplify (x + 1)^2.",
+        target_text=(
+            '{"specialist_id":"sympy","task_type":"symbolic_math",'
+            '"input_payload":{"operation":"simplify","expression":"(x + 1)^2"},'
+            '"confidence":0.9,"reasoning":"math"}'
+        ),
+        task_kind="tool_call_json",
+        metadata={"corpus_domain": "sympy", "corpus_category": "sympy_tool_call"},
+    )
+    final_answer = SupervisedToolUseExample(
+        example_id="example-answer",
+        tenant_id="tenant",
+        source_id="source",
+        authority=0.9,
+        prompt="Use this verified claim.",
+        target_text="Grounded answer.",
+        task_kind="final_answer",
+    )
+
+    monkeypatch.setenv("VECL_TRAIN_PROMPT_MODE", "tool_call_author")
+    mode, builder = _training_prompt_builder()
+
+    assert mode == "tool_call_author"
+    assert builder is not None
+    assert "You are VECL-QB's tool-call author" in builder(tool_call)
+    assert builder(final_answer) == final_answer.prompt
+
+    monkeypatch.setenv("VECL_TRAIN_PROMPT_MODE", "raw")
+    mode, builder = _training_prompt_builder()
+
+    assert mode == "raw"
+    assert builder is None
+
+
+def test_overfit_example_selection_and_loss_summary() -> None:
+    examples = [
+        SupervisedToolUseExample(
+            example_id=f"example-{index}",
+            tenant_id="tenant",
+            source_id="source",
+            authority=0.9,
+            prompt=f"prompt {index}",
+            target_text=f"target {index}",
+            task_kind="tool_call_json" if index < 3 else "final_answer",
+            metadata={"corpus_domain": "stockfish", "corpus_category": "tool_call"},
+        )
+        for index in range(5)
+    ]
+
+    selected = _overfit_examples(examples, sample_seed=7)
+    summary = _diagnostic_loss_summary([3.0, 2.0], [1.0, 2.5])
+
+    assert selected
+    assert all(example.task_kind == "tool_call_json" for example in selected)
+    assert summary["mean_before"] == 2.5
+    assert summary["mean_after"] == 1.75
+    assert summary["mean_drop"] == 0.75
+    assert summary["improved_count"] == 1
+    assert summary["worsened_count"] == 1
+
+
+def test_sparse_cycle_summary_reports_loss_and_delta_norm() -> None:
+    summary = _sparse_cycle_summary(
+        cycle=2,
+        report={
+            "committed": True,
+            "selected_slots": [1, 3],
+            "tensor_delta_records": [
+                {"total_delta_norm": 0.25},
+                {"total_delta_norm": 0.75},
+            ],
+            "before_snapshot_hash": "before",
+            "after_snapshot_hash": "after",
+            "candidate_decision": "accepted",
+        },
+        before_losses=[2.0, 4.0],
+        after_losses=[1.0, 3.0],
+    )
+
+    assert summary["cycle"] == 2
+    assert summary["committed"] is True
+    assert summary["selected_slot_count"] == 2
+    assert summary["tensor_delta_norm_sum"] == 1.0
+    assert summary["loss_summary"]["mean_drop"] == 1.0
 
 
 def test_tool_use_training_coverage_report_checks_train_and_probe_domains() -> None:

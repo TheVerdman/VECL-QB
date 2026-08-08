@@ -303,8 +303,17 @@ creates or restores the named `tool_use_v0` LoRA baseline snapshot, commits the
 sparse update through the learning-event monitor with `ewc_lambda=0.0`, uploads
 the baseline/before/after LoRA snapshots, per-slot selection diagnostics, and
 `summary.json` to GCS, and prints `TOOL_USE_TRAINING_SUMMARY`. By default the
+training prompt mode is `VECL_TRAIN_PROMPT_MODE=tool_call_author`, so
+`tool_call_json` examples are trained with the same VECL tool-call author prompt
+used by the generation probe and runtime payload validation path. Set
+`VECL_TRAIN_PROMPT_MODE=raw` only when deliberately testing the raw corpus prompt.
+By default the
 submit script requires the expanded corpus export directory and checks coverage
 for all current corpus domains: `blast,cross,eda,stockfish,sympy,terraform,timesfm`.
+When a Fisher drift threshold is configured, over-bound candidates are rejected
+before `SPARSE_UPDATE_APPLIED` is emitted; the rejected candidate snapshot is
+kept as an artifact, the pending learning event is aborted, and the active LoRA
+tensors are restored to the start snapshot.
 
 After the first baseline-creating run, pass
 `VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://.../tool_use_v0-baseline-lora.npz` and
@@ -325,6 +334,8 @@ then set:
 ```bash
 export VECL_TRAIN_BASELINE_SNAPSHOT_URI=gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
 export VECL_TRAIN_BASELINE_SNAPSHOT_HASH=465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
+export VECL_TRAIN_EWC_APPROVED_SNAPSHOT_URI=gs://project-49b1b523-d248-434f-bd4-vecl-qb-artifacts/lora-baselines/tool_use_v0/tool_use_v0-baseline-fisher.npz
+export VECL_TRAIN_EWC_APPROVED_SNAPSHOT_HASH=465af72564819f03e83a02b46288c0d612e77083e368f86e443027d06336b5b1
 export VECL_TRAIN_EWC_LAMBDA=0.1
 export VECL_TRAIN_EWC_DRIFT_THRESHOLD=1.0
 ```
@@ -332,6 +343,71 @@ export VECL_TRAIN_EWC_DRIFT_THRESHOLD=1.0
 The first sparse update from an exact approved baseline has zero EWC penalty at
 the starting point; the penalty becomes active for resumed/drifted candidates,
 while the post-update Fisher drift report still gates the candidate immediately.
+To train from a candidate snapshot while regularizing against a separate
+approved snapshot, set `VECL_TRAIN_BASELINE_SNAPSHOT_URI` to the candidate
+start snapshot and set `VECL_TRAIN_EWC_APPROVED_SNAPSHOT_URI` plus
+`VECL_TRAIN_EWC_APPROVED_SNAPSHOT_HASH` to the approved Fisher-bearing baseline.
+For drift calibration or sweep runs, also set
+`VECL_TRAIN_REQUIRE_INLINE_DRIFT=1`; this makes the job fail fast unless the
+approved Fisher snapshot and threshold are present and `summary.json` contains
+an inline drift report.
+
+To attach a small behavioral probe to training runs, set
+`VECL_TRAIN_TOOL_CALL_GENERATION_PROBE_COUNT` to a positive number such as `16`.
+The script restores the before snapshot, generates heldout tool-call JSON,
+validates it against VECL's deterministic payload contracts, restores the after
+snapshot, repeats the generation, and records exact-tool-call accuracy deltas in
+`summary.json`.
+
+To run the tiny-overfit diagnostic instead of committing a sparse learning
+event, set:
+
+```bash
+export VECL_TRAIN_DIAGNOSTIC_MODE=tiny_overfit
+export VECL_TRAIN_DOMAIN_MIX=stockfish
+export VECL_TRAIN_OVERFIT_SAMPLE_COUNT=8
+export VECL_TRAIN_OVERFIT_STEPS=25
+export VECL_TRAIN_OVERFIT_LEARNING_RATE=0.01
+export VECL_TRAIN_OVERFIT_MIN_CE_DROP=0.05
+export VECL_TRAIN_OVERFIT_GENERATION_PROBE_COUNT=0
+zsh scripts/gcp/submit_vertex_tool_use_train.sh
+```
+
+This restores or creates the configured LoRA baseline, selects a tiny
+tool-call batch, applies ordinary dense LoRA optimizer steps without emitting a
+learning commit, and prints `TOOL_USE_OVERFIT_SUMMARY`. The diagnostic is a
+gradient/tokenization sanity check: if CE cannot drop on 8-16 examples with the
+bound off, the training path is mechanically suspect and larger sparse runs
+should wait. Run this CE-only first; a generation-heavy overfit probe can be
+added afterward once the CE path is known to fit in A100 memory.
+
+To run the sparse-overfit diagnostic, set:
+
+```bash
+export VECL_TRAIN_DIAGNOSTIC_MODE=sparse_overfit
+export VECL_TRAIN_DOMAIN_MIX=stockfish
+export VECL_TRAIN_OVERFIT_SAMPLE_COUNT=8
+export VECL_TRAIN_SPARSE_OVERFIT_CYCLES=25
+export VECL_TRAIN_SPARSE_OVERFIT_LEARNING_RATE=0.01
+export VECL_TRAIN_SPARSE_OVERFIT_MAX_SLOTS=8
+export VECL_TRAIN_SPARSE_OVERFIT_GRADIENT_ACCUMULATION_STEPS=8
+export VECL_TRAIN_SPARSE_OVERFIT_MIN_CE_DROP=0.05
+zsh scripts/gcp/submit_vertex_tool_use_train.sh
+```
+
+This uses the same tiny author-prompt batch as the dense diagnostic, but each
+cycle runs through `ToolUseTrainer`, `LearningEventToken`,
+`SparseUpdateMonitor`, the sparse oracle, and `LoRAMemorySubstrate.apply_update`.
+It prints `TOOL_USE_SPARSE_OVERFIT_SUMMARY`. Use it to distinguish a sparse
+capacity/update-dose issue from cross-domain gradient cancellation.
+
+To deliberately prove the rejection path, set an unrealistically low threshold
+and tell the script to expect rejection:
+
+```bash
+export VECL_TRAIN_EWC_DRIFT_THRESHOLD=1e-12
+export VECL_TRAIN_EXPECT_REJECTION=1
+```
 
 Set `VECL_TRAIN_DOMAIN_MIX` to a comma-separated list such as
 `stockfish,sympy,blast` to restrict the proof run. When a focused domain filter
