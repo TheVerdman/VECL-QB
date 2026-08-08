@@ -16,7 +16,7 @@ from vecl.evaluation.fisher import compute_lora_snapshot_drift
 from vecl.provenance.events import EventType, ProvenanceEvent, stable_hash
 from vecl.runtime.monitor import SparseUpdateMonitor
 from vecl.runtime.tokens import create_learning_event_token
-from vecl.sparse.types import SparseMemoryInputs
+from vecl.sparse.types import FloatArray, SparseMemoryInputs
 from vecl.substrate.lora_memory import LoRAMemorySubstrate
 from vecl.training.scoring import (
     activation_from_gradient_summaries,
@@ -612,7 +612,7 @@ class ToolUseTrainer:
         )
 
     def _sparse_inputs(
-        self, tenant_id: str, gradient_summaries: np.ndarray, batch_authority: float
+        self, tenant_id: str, gradient_summaries: FloatArray, batch_authority: float
     ) -> SparseMemoryInputs:
         if gradient_summaries.shape != (self.substrate.slot_count,):
             raise ValueError("gradient_summaries length must match substrate slot_count")
@@ -743,8 +743,8 @@ def snapshot_file_hash(path: str | Path) -> str:
 def _selection_diagnostics(
     *,
     inputs: SparseMemoryInputs,
-    gradient_summaries: np.ndarray,
-    scores: np.ndarray,
+    gradient_summaries: FloatArray,
+    scores: FloatArray,
     result_selected_slots: list[int],
     slot_metadata: list[dict[str, Any]],
     batch_id: str,

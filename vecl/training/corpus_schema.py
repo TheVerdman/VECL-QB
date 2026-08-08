@@ -182,7 +182,7 @@ class ToolUseCorpusRecord:
             authority=float(self.authority),
             prompt=self.prompt,
             target_text=self.target_text,
-            task_kind=self.task_kind,  # type: ignore[arg-type]
+            task_kind=self.task_kind,
             artifact_ids=list(self.artifact_ids),
             claim_ids=list(self.claim_ids),
             metadata=metadata,

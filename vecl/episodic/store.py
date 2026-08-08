@@ -548,10 +548,12 @@ def _qdrant_search(
     limit: int,
 ) -> list[Any]:
     if hasattr(client, "search"):
-        return client.search(
-            collection_name=collection,
-            query_vector=list(query_embedding),
-            limit=limit,
+        return list(
+            client.search(
+                collection_name=collection,
+                query_vector=list(query_embedding),
+                limit=limit,
+            )
         )
     response = client.query_points(
         collection_name=collection,

@@ -1,9 +1,10 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 import numpy as np
 from hypothesis import given, settings
 from hypothesis import strategies as st
 
+from vecl._compat import UTC
 from vecl.provenance.events import EventType, ProvenanceEvent
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.qb.claim_graph import ClaimGraph

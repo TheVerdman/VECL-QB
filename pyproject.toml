@@ -7,22 +7,32 @@ name = "vecl-qb"
 version = "0.1.0"
 description = "Python-first prototype for provenance-first expert orchestration and bounded continual learning."
 readme = "README.md"
-requires-python = ">=3.12"
+requires-python = ">=3.10,<3.13"
+license = { file = "LICENSE" }
+authors = [
+  { name = "VECL-QB contributors" },
+]
+keywords = ["continual-learning", "orchestration", "provenance"]
+classifiers = [
+  "Development Status :: 3 - Alpha",
+  "License :: OSI Approved :: MIT License",
+  "Programming Language :: Python :: 3",
+  "Programming Language :: Python :: 3.10",
+  "Programming Language :: Python :: 3.11",
+  "Programming Language :: Python :: 3.12",
+  "Typing :: Typed",
+]
 dependencies = [
-  "hypothesis>=6.100",
   "networkx>=3.3",
-  "numpy>=2.0",
-  "pydantic>=2.7",
-  "pytest>=8.2",
+  "numpy>=1.25,<2.3",
   "PyYAML>=6.0",
-  "sympy>=1.13",
 ]
 
+[project.urls]
+Repository = "https://github.com/TheVerdman/VECL-QB"
+Issues = "https://github.com/TheVerdman/VECL-QB/issues"
+
 [project.optional-dependencies]
-dev = [
-  "mypy>=1.10",
-  "ruff>=0.5",
-]
 episodic = [
   "qdrant-client>=1.12",
 ]
@@ -38,6 +48,20 @@ substrate = [
   "torchvision>=0.20",
   "transformers>=5.0",
 ]
+specialists = [
+  "sympy>=1.13",
+]
+
+[dependency-groups]
+dev = [
+  "coverage[toml]>=7.6",
+  "hypothesis>=6.100",
+  "mypy>=1.10",
+  "pydantic>=2.7",
+  "pytest>=8.2",
+  "ruff>=0.5",
+  "sympy>=1.13",
+]
 
 [project.scripts]
 vecl = "vecl.cli:main"
@@ -48,19 +72,34 @@ packages = ["vecl"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-q"
+markers = [
+  "integration: cross-component tests that use local resources",
+  "optional: tests requiring an optional dependency or executable",
+]
 
 [tool.ruff]
 line-length = 100
-target-version = "py312"
+target-version = "py310"
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["E501"]
 
 [tool.mypy]
-python_version = "3.12"
+python_version = "3.10"
 packages = ["vecl"]
+strict = true
 ignore_missing_imports = true
-warn_unused_ignores = true
-disallow_untyped_defs = false
-check_untyped_defs = true
+warn_unreachable = true
+show_error_codes = true
+
+[tool.coverage.run]
+branch = true
+source = ["vecl"]
+
+[tool.coverage.report]
+show_missing = true
+skip_covered = true
+
+[tool.uv]
+required-version = ">=0.11.16,<0.13"

@@ -1,5 +1,6 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
+from vecl._compat import UTC
 from vecl.trust.updater import BoundedTrustUpdater, LearnedTrustState, TrustUpdateObservation
 
 

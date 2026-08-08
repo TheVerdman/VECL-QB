@@ -9,7 +9,7 @@ import numpy as np
 from vecl.provenance.events import EventType, stable_hash
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.sparse.oracle import sparse_update_oracle
-from vecl.sparse.types import SparseMemoryInputs
+from vecl.sparse.types import FloatArray, SparseMemoryInputs
 
 
 @dataclass(frozen=True)
@@ -69,7 +69,7 @@ def replay_trace_with_oracle(trace: str | dict[str, Any]) -> ReplayResult:
     validation = validate_trace(data)
     if not validation.valid:
         return ReplayResult(False, "", None, validation.errors)
-    memory: np.ndarray | None = None
+    memory: FloatArray | None = None
     expected_hash: str | None = None
     errors: list[str] = []
     for event in data.get("events", []):

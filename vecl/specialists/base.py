@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from vecl.qb.specialist import Specialist, SpecialistClaim, SpecialistRequest, SpecialistResponse
 
@@ -146,7 +146,7 @@ def _load_callable(import_path: str) -> Callable[[SpecialistRequest], Specialist
     target = getattr(module, attr_name)
     if not callable(target):
         raise TypeError(f"import path is not callable: {import_path}")
-    return target
+    return cast(Callable[[SpecialistRequest], SpecialistRunOutput], target)
 
 
 def _collect_files(directory: Path) -> dict[str, bytes]:

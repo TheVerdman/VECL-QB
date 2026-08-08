@@ -1,7 +1,8 @@
-from datetime import UTC, datetime
+from datetime import datetime
 
 import numpy as np
 
+from vecl._compat import UTC
 from vecl.provenance.ledger import ProvenanceLedger
 from vecl.runtime.monitor import SparseUpdateMonitor
 from vecl.sleep.consolidation import SleepCycleConsolidator

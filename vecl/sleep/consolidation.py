@@ -10,7 +10,7 @@ from vecl.provenance.events import EventType, ProvenanceEvent, stable_hash
 from vecl.runtime.monitor import SparseUpdateMonitor
 from vecl.runtime.tokens import create_learning_event_token
 from vecl.sleep.replay import ReplayBatchBuilder, ReplayCandidate, ReplayPolicy
-from vecl.sparse.types import SparseMemoryInputs
+from vecl.sparse.types import FloatArray, SparseMemoryInputs
 
 
 @dataclass(frozen=True)
@@ -35,7 +35,7 @@ class SleepCycleConsolidator:
         self,
         candidates: list[ReplayCandidate],
         policy: ReplayPolicy,
-        memory_values: np.ndarray,
+        memory_values: FloatArray,
         learning_rate: float,
         min_score: float,
         policy_version: str = "policy-v0",

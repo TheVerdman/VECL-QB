@@ -5,12 +5,16 @@ import json
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
+from typing import Any, cast
 
 import numpy as np
+from numpy.typing import NDArray
 
 from vecl._compat import UTC
 from vecl.provenance.events import EventType, ProvenanceEvent, stable_hash
 from vecl.provenance.ledger import ProvenanceLedger
+
+FloatArray = NDArray[np.float64]
 
 
 @dataclass(frozen=True)
@@ -25,7 +29,7 @@ class MemoryCheckpoint:
 @dataclass(frozen=True)
 class RollbackResult:
     tenant_id: str
-    memory_values: np.ndarray
+    memory_values: FloatArray
     exact: bool
     rollback_event_id: str
     excluded_event_ids: list[str]
@@ -35,11 +39,11 @@ class RollbackResult:
 class CheckpointStore:
     def __init__(self) -> None:
         self._checkpoints: dict[str, MemoryCheckpoint] = {}
-        self._values: dict[str, np.ndarray] = {}
+        self._values: dict[str, FloatArray] = {}
 
     def create_checkpoint(
         self,
-        memory_values: np.ndarray,
+        memory_values: FloatArray,
         tenant_id: str,
         checkpoint_id: str,
         parent_checkpoint_id: str | None = None,
@@ -58,8 +62,8 @@ class CheckpointStore:
         self._values[checkpoint_id] = values.copy()
         return checkpoint
 
-    def restore_checkpoint(self, checkpoint_id: str) -> np.ndarray:
-        return self._values[checkpoint_id].copy()
+    def restore_checkpoint(self, checkpoint_id: str) -> NDArray[Any]:
+        return cast(NDArray[Any], self._values[checkpoint_id].copy())
 
     def get_checkpoint(self, checkpoint_id: str) -> MemoryCheckpoint:
         return self._checkpoints[checkpoint_id]
@@ -79,7 +83,7 @@ class DiskCheckpointStore:
 
     def create_checkpoint(
         self,
-        memory_values: np.ndarray,
+        memory_values: FloatArray,
         tenant_id: str,
         checkpoint_id: str,
         parent_checkpoint_id: str | None = None,
@@ -106,7 +110,7 @@ class DiskCheckpointStore:
         )
         return checkpoint
 
-    def restore_checkpoint(self, checkpoint_id: str) -> np.ndarray:
+    def restore_checkpoint(self, checkpoint_id: str) -> NDArray[Any]:
         checkpoint_dir = self._checkpoint_dir(checkpoint_id)
         values_path = checkpoint_dir / "memory_values.npy"
         metadata_path = checkpoint_dir / "metadata.json"
@@ -118,7 +122,7 @@ class DiskCheckpointStore:
         checkpoint = self.get_checkpoint(checkpoint_id)
         if stable_hash([float(value) for value in values]) != checkpoint.memory_values_hash:
             raise ValueError("checkpoint memory hash mismatch")
-        return np.asarray(values, dtype=np.float64).copy()
+        return cast(NDArray[Any], np.asarray(values, dtype=np.float64).copy())
 
     def get_checkpoint(self, checkpoint_id: str) -> MemoryCheckpoint:
         metadata_path = self._checkpoint_dir(checkpoint_id) / "metadata.json"

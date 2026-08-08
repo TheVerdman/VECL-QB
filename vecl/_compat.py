@@ -1,11 +1,7 @@
-try:
-    from datetime import UTC
-except ImportError:
-    from datetime import timezone
-
-    UTC = timezone.utc  # noqa: UP017
-
 import sys
+from datetime import timezone
+
+UTC = timezone.utc  # noqa: UP017
 
 if sys.version_info >= (3, 11):  # noqa: UP036
     from enum import StrEnum
@@ -14,3 +10,6 @@ else:
 
     class StrEnum(str, Enum):  # noqa: UP042
         pass
+
+
+__all__ = ["StrEnum", "UTC"]

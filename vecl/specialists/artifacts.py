@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import re
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
 from pathlib import Path
@@ -44,7 +45,7 @@ class ArtifactRecord:
         return payload
 
     @classmethod
-    def from_payload(cls, payload: dict[str, Any]) -> ArtifactRecord:
+    def from_payload(cls, payload: Mapping[str, Any]) -> ArtifactRecord:
         return cls(
             artifact_id=str(payload["artifact_id"]),
             producer_specialist_id=str(payload["producer_specialist_id"]),
