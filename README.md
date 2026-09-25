@@ -1,12 +1,18 @@
 # VECL-QB
 
-VECL-QB is a Python research prototype for provenance-first expert orchestration and bounded
-continual learning. A request is routed to typed specialists; their claims become a graph;
-deterministic policy verifies that graph before synthesis; and consequential transitions are
-recorded in an append-only, tenant-scoped provenance chain.
+VECL-QB is a Python research prototype exploring continual learning through specialist tool use,
+constrained updates, and provenance. Requests are routed to typed specialists; their claims become
+a graph for structural policy checks and synthesis. A local append-only ledger records linked,
+tenant-labelled events.
 
-The repository is intentionally honest about its boundary: the CPU orchestration, provenance,
-sparse-update, local persistence, and fail-closed release-gate paths are implemented and tested.
+**Research status:** useful continual-learning gains remain unproven. Implemented bounds cover
+per-update slot selection; Fisher-weighted drift checks are optional. These do not establish
+behavioral, forgetting, or lifetime bounds. Known token, response, and evidence-validation gaps
+also limit authorization and tenant isolation. See [research status and publication scope](docs/research-status.md)
+for the reproduced cases, negative learning results, and pending data/archive decisions.
+
+CPU orchestration, provenance, sparse-update, local persistence, and release-gate paths have local
+implementations and tests. Optional LoRA substrate/trainer tests can skip when dependencies are absent.
 CUDA and executable TLA+ verification are not implemented. Cloud/model evaluations are optional,
 cost-bearing experiments and are never part of the default check.
 
@@ -47,8 +53,8 @@ flowchart LR
     Q --> S["Typed specialist(s)"]
     S --> C["Claims + artifacts"]
     C --> G["Claim graph"]
-    G --> V["Deterministic verification"]
-    V -->|pass| A["Grounded synthesis"]
+    G --> V["Structural policy checks"]
+    V -->|pass| A["Claim-linked synthesis"]
     V -->|conflict / policy gap| H["Fail or needs review"]
     R -.-> P["Append-only provenance ledger"]
     C -.-> P
@@ -57,21 +63,25 @@ flowchart LR
     H -.-> P
 ```
 
-The same governance shape applies to learning: a prepared learning event authorizes a bounded
-number of slots; the update is checked against the CPU oracle; the token is revalidated at commit;
-and the mutation is appended as a provenance event or aborted.
+Learning uses prepared-event tokens, a per-call `max_slots` limit, commit-time token checks, and
+linked update/commit/abort records. The monitor recomputes scalar slot arithmetic with the same
+CPU oracle; it does not independently verify the actual LoRA tensor transition. Token reuse after
+abort/commit and trainer exception ordering prevent a strict single-use or transactional guarantee.
 
 ## Implemented today
 
 - Rule-based and prompted routing, typed specialist requests/responses, claim graphs, conflict and
-  root-support verification, grounded synthesis, and DAG specialist chains.
+  supplied-root-label checks, claim-linked synthesis, and DAG specialist chains. These checks do
+  not authenticate evidence or bind every response to its request/tenant.
 - Immutable event payloads with payload hashes, chain hashes, parent links, tenant checks, typed
   learning-event references, and full in-memory/SQLite chain-integrity verification.
-- Deterministic sparse scoring and TopK, bounded learning tokens, commit-time authorization checks,
-  selected-slot cardinality enforcement, exact slot/delta checks, and tight numeric comparison to
-  an independently recomputed CPU oracle.
+- Deterministic sparse scoring and TopK, token/threshold checks, per-update selected-slot cardinality
+  enforcement, scalar slot/delta checks, and numeric recomputation with the CPU oracle.
+- Optional Fisher-weighted snapshot-distance rejection/restoration when a Fisher-bearing reference
+  snapshot and threshold are supplied. Defaults are `ewc_drift_threshold=None` and `ewc_lambda=0.0`;
+  this is not evidence of retained behavior or reduced forgetting.
 - Append-only quarantine, checkpoint, rollback, sleep/replay, trace, artifact, and local episodic
-  storage paths.
+  storage paths. Snapshot restoration exists; exact transactional rollback is not established.
 - A release report and gate that require a hashed manifest, clean Git revision, evaluator
   identity/version, candidate binding, command/configuration, result hashes, complete gate
   categories, and non-synthetic evidence before approval. Sensitive environment values are
@@ -104,14 +114,16 @@ and the mutation is appended as a provenance event or aborted.
   differential suite.
 - Release evidence records how an evaluation ran, but it is not remote attestation. Approval is
   intentionally limited to a clean checkout and a complete, content-hashed report.
-- Verification is structural and policy-based. It detects unsupported/conflicting claims and
-  missing roots; it does not replace domain validation performed by a specialist.
+- Verification is structural and policy-based. It checks graph support/conflicts and supplied root
+  counts; fabricated evidence/root labels passed the audited fixtures. Domain validation and
+  authenticated evidence resolution remain separate requirements.
 - Opt-in tool download helpers reject archive traversal and links, but they do not implement
   signed-binary attestation. Serious evaluations should supply independently pinned local
   binaries rather than treating a successful download as a trust proof.
 - Historical experiment results and hashes are preserved under `docs/`, `reports/`, and data
-  metadata. Large generated corpora are excluded from Git and have a deterministic regeneration
-  path in [`data/README.md`](data/README.md).
+  metadata. Large generated corpora are absent from the current tree but remain in reachable Git
+  history. See the [publication inventory](docs/research-status.md#publication-materials-and-pending-owner-decision)
+  and deterministic regeneration instructions in [`data/README.md`](data/README.md).
 
 ## Suggested 10–20 minute review path
 
